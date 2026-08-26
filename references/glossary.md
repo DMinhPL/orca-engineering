@@ -63,6 +63,9 @@ descriptive; the normative values (bands, tiers, gate conditions) live in
 - **Protected paths** — files or directories that always force at least a hard
   override (band ≥ L) and gate G2 if they're in the change surface. Set per-repo in
   `agents-models.yaml`.
+- **Branch category** — the `feat` / `fix` / `update` / `concept` prefix on a work
+  branch (`feat/auth-role-mechanism-101147`). Derived from the task type rather than
+  chosen freely, decided by Lead at classification. See `modification-policy.md`.
 
 ## Workflow
 

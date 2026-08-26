@@ -108,6 +108,13 @@ kind of change permitted ("modify — register provider only" constrains far mor
 "modify"). BA proposes the allowlist from its blast-radius analysis; Lead grants it.
 Dev editing outside it is forbidden and routes back here as a change request.
 
+M2 also means a **work branch**, and you name it — `modification_policy.branch_naming`,
+`{category}/{slug}[-{ticket}]`. The category is not a free choice: `category_by_task_type`
+maps it from the type you assigned at step 1, so the branch cannot disagree with the
+classification. Override it only with a recorded reason. Include the ticket suffix only
+when an id actually appears in the request or requirement — never invent one. Put the
+branch name in the dispatch envelope; a worker that has to guess it will guess wrong.
+
 ### 5. Gates
 
 `human_gates` enumerates the six. A gate is blocking for the writes it governs —

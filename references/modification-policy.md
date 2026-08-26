@@ -90,10 +90,72 @@ ROLLBACK
 `if_cannot_be_written_honestly: escalate_to_M4`. The inability to describe the undo
 *is* the finding.
 
+## Branch naming
+
+`modification_policy.branch_naming`. Lead decides the name at classification, in the
+same breath as the task type — and a branch exists only from **M2**, because M0 and M1
+do not write.
+
+```
+{category}/{slug}                 feat/auth-role-mechanism
+{category}/{slug}-{ticket}        feat/auth-role-mechanism-101147
+```
+
+### The category is derived, not chosen
+
+There are four categories, and Lead does not pick one freely — it falls out of the
+task type already assigned at step 1 of the Lead loop:
+
+| Category | Means | Task types |
+|---|---|---|
+| **feat** | a capability or user-visible behavior that did not exist | `feature` |
+| **fix** | restore intended behavior — defect, regression, vulnerability | `bug`, `security`, `release-fix` |
+| **update** | change existing behavior or structure, no new capability | `refactor`, `performance`, `infra`, `migration` |
+| **concept** | spike or prototype not intended to ship as written | `investigation`, `review-only` |
+
+One taxonomy, not two. If the category were a free choice, it would be a second
+classification decision that could silently disagree with the first — a task typed
+`bug` sitting on a `feat/` branch tells every later reader the wrong thing.
+
+`security` maps to **fix** by default, on the reasoning that most security work
+restores an intended property. Use `feat` when the work *adds* a control that did not
+exist before — new SSO, a new audit log. That is the one row where the default is a
+judgement rather than a mapping, so `category_override` requires a recorded reason.
+
+### The slug
+
+Same feature slug as the `.docs/features/` folder — `documentation.folder_naming`
+already defines the style (lowercase kebab, 2–4 words, 32 chars). Reusing it means the
+branch and its documentation are findable from each other. Strip articles, the ticket
+id, and the category word: `feat/feat-add-the-auth-thing` is three kinds of wrong.
+
+### The ticket suffix
+
+Included **only when a ticket id actually appears** in the user's request, the task
+title, or the requirement text — never invented, and omitted entirely when absent.
+Recognised forms, per `branch_naming.ticket.patterns`:
+
+```
+PROJ-123    →  -proj-123        (lowercased)
+#101147     →  -101147          (hash stripped)
+101147      →  -101147          (bare, 4+ digits)
+```
+
+If the requirement mentions several ids, use the one the work is *filed under* and
+record the others in the decision log. Do not chain them into the branch name.
+
+### Note on traceability
+
+The branch no longer carries `{task_id}` — the previous pattern was
+`orca/{task_id}-{slug}`. Task traceability now lives entirely in the commit trailer
+(`[TASK-####]` below) and in `decisions.jsonl`. If you rely on branch names to find
+the task, that link moved; the ticket suffix is a *ticket* reference, not a task id,
+and the two are not interchangeable.
+
 ## Commits
 
 ```
-branch   orca/{task_id}-{slug}
+branch   {category}/{slug}[-{ticket}]
 commit   <type>(<scope>): <summary>  [TASK-####]
 body     what changed and why
          acceptance criteria satisfied: AC-01, AC-03

@@ -55,7 +55,7 @@ optimisation.
     "an acceptance criterion appears untestable or contradictory"
   ],
 
-  "return_artifacts": ["dev/development.md", "branch orca/TASK-0142-third-party-signin"]
+  "return_artifacts": ["dev/development.md", "branch feat/third-party-signin-101147"]
 }
 ```
 

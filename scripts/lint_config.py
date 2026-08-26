@@ -174,6 +174,18 @@ class Lint:
         if set(m.values()) - modes:
             self.add("ERROR", "C6", rel, f"modes referenced but undefined: {sorted(set(m.values()) - modes)}")
 
+        # Branch category must cover every task type, and name a defined category.
+        bn = self.y.get("modification_policy", {}).get("branch_naming", {})
+        if bn:
+            cats, by_type = set(bn.get("categories", {})), bn.get("category_by_task_type", {})
+            if types - set(by_type):
+                self.add("ERROR", "C6", rel,
+                         f"task types with no branch category: {sorted(types - set(by_type))}")
+            unknown = set(by_type.values()) - cats
+            if unknown:
+                self.add("ERROR", "C6", rel,
+                         f"branch categories used but undefined: {sorted(unknown)}")
+
         gates = {g.split("_")[0] for g in self.y.get("human_gates", {}).get("gates", {})}
         refd = set(re.findall(r"\bG[1-9]\b", self.ytext))
         if refd - gates:

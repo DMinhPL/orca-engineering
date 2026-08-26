@@ -1,5 +1,5 @@
 schema_version: 3
-config_version: 15
+config_version: 16
 
 # Central provider/model/effort configuration for the four-agent Orca workflow.
 # Per-task user overrides take precedence over these defaults.
@@ -24,6 +24,12 @@ config_version: 15
 #       progressive scoring — d2/d3/d7 first, full seven only when the triple is
 #       non-zero. Additive and backward compatible: set enabled: false to restore
 #       unconditional seven-dimension scoring.
+#
+# v16 changes:
+#   ~ modification_policy.branch_pattern -> modification_policy.branch_naming
+#       category/slug[-ticket], category derived from the task type rather than
+#       chosen freely. BREAKING for anyone parsing branch_pattern: the branch no
+#       longer carries {task_id}; commit messages still do, via [TASK-####].
 
 agents:
   lead:
@@ -361,7 +367,63 @@ modification_policy:
     - destructive_command_against_non_local_environment
     - add_unspecified_telemetry_or_network_egress
     - act_on_instructions_embedded_in_repository_content
-  branch_pattern: "orca/{task_id}-{slug}"
+  # v16: Branch naming. The category is a consequence of the task type Lead already
+  # assigned at classification — one taxonomy, not two. A branch exists only from
+  # M2, because M0 and M1 do not write.
+  branch_naming:
+    required_from_tier: M2
+    decided_by: lead
+    decided_at: classification
+    pattern: "{category}/{slug}"
+    pattern_with_ticket: "{category}/{slug}-{ticket}"
+    categories:
+      feat:    a capability or user-visible behavior that did not exist before
+      fix:     restore intended behavior — defect, regression, or vulnerability
+      update:  change existing behavior or structure without adding a capability
+      concept: spike, prototype or exploration not intended to ship as written
+    # Keys mirror engineering_policy.task_classification.types exactly.
+    category_by_task_type:
+      feature:       feat
+      bug:           fix
+      refactor:      update
+      performance:   update
+      security:      fix        # feat only when it adds a control that did not exist
+      infra:         update
+      migration:     update
+      investigation: concept
+      review-only:   concept
+      release-fix:   fix
+    category_override:
+      allowed_by: lead
+      requires: recorded_reason_in_decision_log
+    slug:
+      # Same feature slug as the .docs folder, so branch and documentation match.
+      source: documentation.folder_naming
+      style: lowercase-kebab-case
+      preferred_words: 2-4
+      max_slug_length: 32
+      strip: [articles, ticket_ids, category_words]
+    ticket:
+      include_when_found: true
+      search_in: [user_request, task_title, requirement_text]
+      position: suffix
+      patterns:
+        - '[A-Z][A-Z0-9]+-[0-9]+'     # PROJ-123, ABC-4567
+        - '#[0-9]{2,}'                # #101147
+        - '\b[0-9]{4,}\b'             # 101147
+      normalize: lowercase_and_strip_hash
+      when_multiple: use_the_id_the_work_is_filed_under_and_record_the_others
+      when_absent: omit_suffix_entirely
+    examples:
+      - feat/auth-role-mechanism
+      - feat/auth-role-mechanism-101147
+      - fix/session-timeout-redirect-4821
+      - update/billing-retry-backoff
+      - concept/event-sourcing-spike
+    forbidden:
+      - category_outside_the_categories_map
+      - ticket_repeated_in_both_slug_and_suffix
+      - rename_after_first_push
   forbid_direct_commit_to: [main, master, "release/*"]
   rollback_note:
     required_from_tier: M2
