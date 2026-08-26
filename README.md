@@ -70,6 +70,7 @@ the YAML wins and the skill file is the bug —
 | `workflows.md` | The gate set, workflow-mode catalogue, and cross-cutting operations |
 | `skills/orca-*/SKILL.md` | Role-scoped procedures (Lead, BA, Dev, QC, change control, closeout) |
 | `references/agents-models.yaml` | All providers, models, efforts, thresholds, and policy |
+| `references/glossary.md` | Definitions for the acronyms and abbreviations used throughout (CAS, M0–M4, G1–G6, PMBOK, etc.) |
 | `references/complexity-model.md` | The seven-dimension sizing rubric |
 | `references/modification-policy.md` | How write tiers M0–M4, allowlists, and protected paths work |
 | `references/handoff-protocol.md` | Dispatch/return envelopes and delta-only context |
