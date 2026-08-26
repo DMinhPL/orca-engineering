@@ -35,9 +35,11 @@ and PMI's AI standard to small, high-frequency software tasks — see
 
 1. **Every task enters through `SKILL.md`**, which routes by role to the matching
    skill file and reads `references/agents-models.yaml` for parameters.
-2. **Lead** scores task complexity (seven dimensions, XS–XL — see
-   [`references/complexity-model.md`](references/complexity-model.md)), picks a
-   workflow mode, and dispatches specialists as fresh, cold-boot supervised workers.
+2. **Lead** scores task complexity into a band (XS–XL) using a progressive rubric —
+   hard overrides first, then three safety dimensions, then the remaining four only
+   if needed (see [`references/complexity-model.md`](references/complexity-model.md))
+   — picks a workflow mode, and dispatches specialists as fresh, cold-boot supervised
+   workers.
 3. **BA, Dev, QC** each read only their own role skill plus the YAML — never the
    whole lifecycle — do their phase, and return a `worker_done` report to Lead.
 4. **Lead** waits for each dispatch to reach a terminal state, checks reports for
@@ -105,6 +107,6 @@ detail on when each applies and which gates it emphasises:
 
 ## Status
 
-Config schema v2 (`config_version: 13`). See [`REVIEW.md`](REVIEW.md) and
+Config `schema_version: 3`, `config_version: 15`. See [`REVIEW.md`](REVIEW.md) and
 [`REVIEW-workflows.md`](REVIEW-workflows.md) for the review history behind the
 current design.

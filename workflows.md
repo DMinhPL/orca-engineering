@@ -165,6 +165,10 @@ Only when the requirement is already explicit and confirmed, **no hard override
 matched**, and the band is XS or S. The middle condition matters most: a two-line
 change to a protected path is not a simple task whatever its size.
 
+Reaching XS is itself progressive — `complexity_assessment.triage` matches hard
+overrides first, then scores only d2/d3/d7, and skips the remaining four dimensions
+when those three are clean. Sizing a trivial change must not cost more than the change.
+
 Lead may persist the user's already-confirmed requirement into the requirement
 document. Lead may **not** invent or derive new business rules in place of BA
 (`workflow_modes.simple.ba_substitution`). The moment a new business rule is needed,

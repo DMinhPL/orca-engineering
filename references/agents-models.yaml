@@ -1,5 +1,5 @@
 schema_version: 3
-config_version: 14
+config_version: 15
 
 # Central provider/model/effort configuration for the four-agent Orca workflow.
 # Per-task user overrides take precedence over these defaults.
@@ -18,6 +18,12 @@ config_version: 14
 #   ~ workflow_modes          review_fix differentiated from simple; type→mode defaults added
 #   ~ agents.ba.escalation    model escalation added alongside effort
 #   ~ documentation.files     qc report, decision log, risk section
+#
+# v15 changes:
+#   + complexity_assessment.triage
+#       progressive scoring — d2/d3/d7 first, full seven only when the triple is
+#       non-zero. Additive and backward compatible: set enabled: false to restore
+#       unconditional seven-dimension scoring.
 
 agents:
   lead:
@@ -241,6 +247,30 @@ complexity_assessment:
     d5_verification_difficulty:  how hard to prove it works
     d6_novelty:                  precedent in this repository
     d7_reversibility:            cost of undo
+  # v15: Progressive scoring. Scoring seven dimensions on a typo fix is ceremony
+  # spent to discover that no ceremony was needed. d2/d3/d7 carry the safety
+  # signal; d1/d4/d5/d6 tune profile and effort and rarely change a safety
+  # decision alone. Score the triple first and stop early when it is clean.
+  triage:
+    enabled: true
+    dimensions: [d2, d3, d7]
+    # Hard-override matching is NOT part of the fast path. It runs unconditionally
+    # and first, because it is a path/keyword match rather than a judgement — and
+    # it is the check that catches a two-line change to an auth file.
+    hard_override_check: always_first_and_unconditional
+    fast_path:
+      when: { d2: 0, d3: 0, d7: 0, hard_override_matched: false }
+      effect:
+        band: XS
+        recorded_total: fast_path
+        dimensions_not_scored: [d1, d4, d5, d6]
+    otherwise: score_all_seven_dimensions
+    record: [d2, d3, d7, fast_path_taken, hard_override_matched]
+    # d5 is the dimension most commonly under-scored across pods and is
+    # deliberately absent from the triple. Omitting it is safe ONLY because the
+    # fast path requires d3 = 0: nothing that cannot break is hard to prove. If
+    # the d3 = 0 condition is ever loosened, d5 must rejoin the triage set.
+    d5_omission_valid_only_while: d3_is_zero_in_fast_path
   bands:
     XS: { range: [0, 3],   workflow_mode: simple,   complexity_profile: simple,  max_modification_tier: M2 }
     S:  { range: [4, 7],   workflow_mode: simple,   complexity_profile: simple,  max_modification_tier: M2 }

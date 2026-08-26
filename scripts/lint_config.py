@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Orca — config lint.
 
@@ -45,7 +45,7 @@ class Lint:
         self.root, self.strict = root, strict
         self.findings = []
         self.ypath = root / YAML_REL
-        self.ytext = self.ypath.read_text()
+        self.ytext = self.ypath.read_text(encoding="utf-8")
         self.y = yaml.safe_load(self.ytext)
 
     def add(self, sev, code, where, msg):
@@ -68,7 +68,7 @@ class Lint:
         for p, rel in self.files():
             if rel in MODEL_EXEMPT:
                 continue
-            txt = p.read_text()
+            txt = p.read_text(encoding="utf-8")
             for m in models:
                 if m in txt:
                     self.add("ERROR", "C1", rel,
@@ -88,7 +88,7 @@ class Lint:
         for p, rel in self.files():
             if rel in MODEL_EXEMPT:
                 continue
-            for role, eff in pat.findall(p.read_text()):
+            for role, eff in pat.findall(p.read_text(encoding="utf-8")):
                 self.add("ERROR", "C2", rel,
                          f"'{role} default ... {eff}' restates agents.{role.lower()}.effort")
 
@@ -99,7 +99,7 @@ class Lint:
         for p, rel in self.files():
             if rel in FLOW_EXEMPT:
                 continue
-            for line in arrow.findall(p.read_text()):
+            for line in arrow.findall(p.read_text(encoding="utf-8")):
                 norm = re.sub(r"\s+", " ", line.lower().replace("→", "->")).strip()
                 for m, f in flows.items():
                     if norm.startswith("user -> " + f.split(" -> ", 0)[0]) and norm.count("->") >= 2:
@@ -128,7 +128,7 @@ class Lint:
             return True
 
         for p, rel in self.files():
-            for ref in set(re.findall(r"`([a-z_]+(?:\.[a-z_0-9\*\[\]]+)+)`", p.read_text())):
+            for ref in set(re.findall(r"`([a-z_]+(?:\.[a-z_0-9\*\[\]]+)+)`", p.read_text(encoding="utf-8"))):
                 head = ref.split(".")[0]
                 if head not in self.y:
                     continue
@@ -147,7 +147,7 @@ class Lint:
             "P0": "engineering_policy.defect_severity",
         }
         for p, rel in self.files():
-            txt = p.read_text()
+            txt = p.read_text(encoding="utf-8")
             for term, home in vocab.items():
                 key = term.lower().replace(" ", "_").replace("--", "").replace("-", "_")
                 if term in txt and key not in defined.lower():

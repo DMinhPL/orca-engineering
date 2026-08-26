@@ -51,7 +51,7 @@ exists to avoid.
 
 - `workflows.md` — the gate set, the mode catalogue, and the cross-cutting operations
 - `references/agents-models.yaml` — all parameters and policy
-- `references/complexity-model.md` — the seven-dimension rubric behind `complexity_assessment`
+- `references/complexity-model.md` — the seven-dimension rubric behind `complexity_assessment`, and the progressive triage that skips four of them on trivial work
 - `references/modification-policy.md` — how M0–M4, allowlists and protected paths work in practice
 - `references/handoff-protocol.md` — dispatch and return envelopes, delta-only context
 - `references/pmbok-mapping.md` — traceability to PMBOK 8th, the Agile Practice Guide, and PMI's AI standard

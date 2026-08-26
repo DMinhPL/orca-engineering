@@ -9,6 +9,7 @@ Deterministic scorer so two agents sizing the same request land in the same band
 Scoring rubric lives in references/complexity-model.md.
 
 Usage:
+    python complexity_score.py --triage --d2 0 --d3 0 --d7 0
     python complexity_score.py --d1 2 --d2 1 --d3 3 --d4 2 --d5 2 --d6 1 --d7 2
     python complexity_score.py --d1 2 ... --override security_boundary_change
     python complexity_score.py --interactive
@@ -60,11 +61,64 @@ MODE = {
 ACTION = {"XL": "DECOMPOSE into child tasks and re-score each"}
 
 
+# Mirrors complexity_assessment.triage. The three dimensions that carry the safety
+# signal; d1/d4/d5/d6 tune profile and effort and are skipped when these are clean.
+TRIAGE_DIMS = ["d2", "d3", "d7"]
+
+
 def band_for(total):
     for lo, hi, name, tier, mod, gate in BANDS:
         if lo <= total <= hi:
             return {"size": name, "effort_floor": tier, "max_mod_tier": mod, "human_gate": gate}
     raise ValueError(f"total {total} out of range 0-21")
+
+
+def triage(scores, overrides=None):
+    """Progressive scoring gate — complexity_assessment.triage.
+
+    Hard overrides are checked first and unconditionally: they are a path/keyword
+    match, not a judgement, and they are what stops a two-line auth change from
+    taking the fast path. The fast path fires only on unanimous zero.
+    """
+    overrides = overrides or []
+    for k in TRIAGE_DIMS:
+        v = scores.get(k)
+        if v is None or not 0 <= v <= 3:
+            raise ValueError(f"{k}={v} out of range 0-3")
+
+    if overrides:
+        return {
+            "fast_path": False,
+            "reason": f"hard override matched: {', '.join(overrides)}",
+            "next": "score all seven dimensions",
+            "triage_dimensions": {k: scores[k] for k in TRIAGE_DIMS},
+            "overrides": list(overrides),
+        }
+
+    nonzero = [f"{k}={scores[k]}" for k in TRIAGE_DIMS if scores[k]]
+    if nonzero:
+        return {
+            "fast_path": False,
+            "reason": f"triage dimension non-zero: {', '.join(nonzero)}",
+            "next": "score all seven dimensions",
+            "triage_dimensions": {k: scores[k] for k in TRIAGE_DIMS},
+        }
+
+    mode, profile, cap = MODE["XS"]
+    r = band_for(0)
+    r.update({
+        "fast_path": True,
+        "total": 0,
+        "recorded_as": "fast-path (d2/d3/d7 = 0, no hard override)",
+        "triage_dimensions": dict.fromkeys(TRIAGE_DIMS, 0),
+        "dimensions_not_scored": ["d1", "d4", "d5", "d6"],
+        "max_mod_tier": cap,
+        "workflow_mode": mode,
+        "complexity_profile": profile,
+        "notes": ["d1/d4/d5/d6 deliberately not scored; d5 omission is valid only "
+                  "because d3 = 0"],
+    })
+    return r
 
 
 def score(scores, overrides=None):
@@ -149,6 +203,29 @@ def render(r):
     return "\n".join(lines)
 
 
+def render_triage(r):
+    lines = ["┌─ CAS triage ──────────────────────────────────────"]
+    for k in TRIAGE_DIMS:
+        v = r["triage_dimensions"][k]
+        label = DIMENSIONS[k][0]
+        lines.append(f"│ {k.upper()} {'█' * v}{'·' * (3 - v)}  {v}  {label}")
+    lines.append("├───────────────────────────────────────────────────")
+    if r["fast_path"]:
+        lines.append("│ FAST PATH    yes")
+        lines.append(f"│ SIZE         {r['size']}  (recorded as fast-path)")
+        lines.append(f"│ MAX MOD TIER {r['max_mod_tier']}")
+        lines.append(f"│ WORKFLOW     {r['workflow_mode']}  ·  profile {r['complexity_profile']}")
+        lines.append(f"│ NOT SCORED   {', '.join(r['dimensions_not_scored'])}")
+        for n in r["notes"]:
+            lines.append(f"│ ! {n}")
+    else:
+        lines.append("│ FAST PATH    no")
+        lines.append(f"│ REASON       {r['reason']}")
+        lines.append(f"│ NEXT         {r['next']}")
+    lines.append("└───────────────────────────────────────────────────")
+    return "\n".join(lines)
+
+
 def interactive():
     print("Score each dimension 0-3. See references/complexity-model.md for the rubric.\n")
     s = {}
@@ -177,8 +254,24 @@ def main():
     p.add_argument("--override", action="append", default=[], choices=HARD_OVERRIDES,
                    help="hard override flag; repeatable")
     p.add_argument("--interactive", action="store_true")
+    p.add_argument("--triage", action="store_true",
+                   help="progressive gate: score d2/d3/d7 only and report whether "
+                        "the XS fast path applies")
     p.add_argument("--json", action="store_true", help="machine-readable output")
     a = p.parse_args()
+
+    if a.triage:
+        s = {k: getattr(a, k) for k in TRIAGE_DIMS}
+        missing = [k for k, v in s.items() if v is None]
+        if missing:
+            p.error(f"--triage needs: {', '.join('--' + m for m in missing)}")
+        try:
+            r = triage(s, a.override)
+        except ValueError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+        print(json.dumps(r, indent=2) if a.json else render_triage(r))
+        return 0
 
     if a.interactive:
         s, ov = interactive()

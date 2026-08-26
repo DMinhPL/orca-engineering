@@ -41,7 +41,7 @@ blocker to report, not a reason to improvise.
 
 ```
  1  CLASSIFY      type from engineering_policy.task_classification.types
- 2  SCORE         complexity_assessment — at DEFAULT effort, always
+ 2  SCORE         complexity_assessment — overrides, then triage, at DEFAULT effort
  3  SELECT        workflow_mode + complexity_profile from the band
  4  GRANT         modification_tier + file_allowlist (BA proposes, Lead grants)
  5  GATE          raise G1/G2 if the band or tier demands it
@@ -53,18 +53,32 @@ blocker to report, not a reason to improvise.
 
 ### 1–2. Classify and score
 
-Score the seven dimensions of `complexity_assessment` before choosing anything
-else. This is the cheapest step in the workflow and it must stay that way —
+Scoring is progressive — `complexity_assessment.triage`. Run it in this order, before
+choosing anything else:
+
+1. **Match `hard_overrides` first, unconditionally.** They are matched, not
+   calculated, and they beat the arithmetic: minimum band L, complex profile, gate
+   G1. Security, secrets, PII, schema, public API, infra, licensing, irreversibility,
+   protected paths. This runs before any dimension is scored, because it is the check
+   that stops a two-line change to an auth file from being sized as trivial.
+2. **Score the triage triple — d2, d3, d7.** Ambiguity, blast radius, reversibility:
+   the three dimensions that carry the safety signal. The other four tune profile and
+   effort and rarely move a safety decision on their own.
+3. **Branch.** All three are 0 *and* no override matched → band XS, recorded as
+   `fast-path`, and d1/d4/d5/d6 are not scored. Anything else → score all seven.
+
+This is the cheapest step in the workflow and it must stay that way —
 `optimization.rules` forbids scoring at escalated effort. You are scoring from the
 request text and a shallow look at the repo, not from an analysis pass. The score is
 provisional; `rescore_triggers` exists precisely because it will sometimes be wrong.
 
-Check `hard_overrides` separately. They are matched, not calculated, and they
-override the arithmetic: minimum band L, complex profile, gate G1. Security, secrets,
-PII, schema, public API, infra, licensing, irreversibility, protected paths.
+Record the triple and the `fast_path_taken` flag even when the fast path fires. A
+fast path that leaves no trace is a bypass, and the retrospective needs the trace to
+find a band that was set too low.
 
-`scripts/complexity_score.py` gives a deterministic score if you want two Leads to
-agree on the same request.
+`scripts/complexity_score.py --triage --d2 N --d3 N --d7 N` runs the gate and reports
+whether the fast path applies; without `--triage` it scores all seven. Use it when
+two Leads must land on the same band for the same request.
 
 ### 3. Select mode and profile
 

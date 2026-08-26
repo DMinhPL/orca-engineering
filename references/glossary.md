@@ -24,6 +24,11 @@ descriptive; the normative values (bands, tiers, gate conditions) live in
 - **d1–d7** — the seven CAS dimensions: scope breadth, requirement ambiguity, blast
   radius, integration surface, verification difficulty, novelty, reversibility. Each
   scored 0–3.
+- **Triage triple** — d2, d3, d7: the three CAS dimensions carrying the safety signal,
+  scored first under progressive scoring. See `complexity-model.md`.
+- **Fast path** — when the triage triple is all zero and no hard override matched, the
+  task is banded XS without scoring d1/d4/d5/d6. Recorded as `fast-path` in the
+  decision log so it stays auditable.
 - **XS / S / M / L / XL** — the five complexity bands the CAS total maps to, from a
   four-sentence trivial change (XS) to a task that must be decomposed before it can
   run at all (XL). See `complexity-model.md`.

@@ -16,6 +16,49 @@ sizing must never be the expensive step. You score from the request text and a s
 look at the repo, not from an analysis pass. The score is provisional;
 `rescore_triggers` exists because it will sometimes be wrong.
 
+## Progressive scoring — the triage triple
+
+`complexity_assessment.triage`. Scoring seven dimensions on a one-line typo fix is
+ceremony spent to discover that no ceremony was needed. The rubric is therefore
+progressive rather than flat.
+
+**Step 0 — match hard overrides. Always, unconditionally, first.** This is not part of
+the fast path and is never skipped. It is a path and keyword match, not a judgement,
+so it costs almost nothing — and it is the check that stops a two-line change to an
+auth file from being treated as trivial.
+
+**Step 1 — score three dimensions: d2, d3, d7.** Ambiguity (do we need BA?), blast
+radius (what breaks?), reversibility (can we undo it?). These three carry the safety
+signal; the other four tune profile and effort and rarely change a safety decision on
+their own.
+
+**Step 2 — branch.**
+
+- All three are 0 **and** no hard override matched → band **XS**, recorded as
+  `fast-path`, and `d1/d4/d5/d6` are not scored. Stop here.
+- Anything else → score all seven and proceed as normal.
+
+Three properties make this safe, and they are the reason it is a fast path rather than
+a bypass:
+
+- **Nothing that gates safety is skipped.** Hard overrides run regardless, and the
+  three dimensions retained are the three that can force a band upward on their own.
+- **It stays auditable.** Three scores plus the `fast_path_taken` flag go into
+  `decisions.jsonl`, so a retrospective can still ask whether a task was under-scored.
+  A bypass would leave nothing to review.
+- **It degrades toward the full rubric, never away from it.** Any doubt on any of the
+  three, and you are back on all seven. The fast path only triggers on unanimous zero.
+
+### Why d5 is not in the triple
+
+`d5` verification difficulty is the dimension most commonly under-scored across pods —
+see "Re-scoring" below — so leaving it out looks like exactly the wrong call. It is
+safe here for one specific reason: **the fast path requires `d3 = 0`.** Nothing that
+cannot break is hard to prove. The two conditions are coupled, and
+`triage.d5_omission_valid_only_while: d3_is_zero_in_fast_path` records that coupling in
+the config. If you ever loosen the fast path to admit `d3 = 1`, d5 must rejoin the
+triage set in the same edit.
+
 ## The dimensions
 
 **d1 · Scope breadth** — 0 one function · 1 two to five files in one module ·
@@ -67,10 +110,13 @@ across forty files goes to Dev at default effort with a tight allowlist.
 ## Worked examples
 
 **"Footer copyright year is hardcoded."**
-0·0·0·0·0·0·0 = **0, XS.** Simple mode, tier M2, one-file allowlist. About four
-sentences of process. Anything more is waste.
+No hard override. d2·d3·d7 = 0·0·0 → **fast path, XS**, recorded as `fast-path`; the
+other four dimensions are never scored. Simple mode, tier M2, one-file allowlist.
+About four sentences of process. Anything more is waste — including the process of
+establishing that nothing more is needed.
 
 **"Add CSV export to the reports page."**
+Triage gives d2=1, so the fast path does not apply and all seven are scored.
 2·1·1·0·2·1·0 = **7, S.** Simple mode is permissible if the requirement is explicit —
 but d5=2 says verification is not trivial, so confirm the boundary behaviours
 (delimiter, encoding, large files, permissions) are stated before skipping BA. If
@@ -107,7 +153,12 @@ there, adjust the rubric rather than individual estimates.
 override, so two Leads scoring the same dimensions get the same band.
 
 ```
+python scripts/complexity_score.py --triage --d2 0 --d3 0 --d7 0   # fast-path check
 python scripts/complexity_score.py --d1 2 --d2 2 --d3 3 --d4 2 --d5 2 --d6 1 --d7 2
 python scripts/complexity_score.py --interactive
 python scripts/complexity_score.py --json ...     # for decisions.jsonl
 ```
+
+Run `--triage` first. It either returns band XS with the fast path taken, or tells you
+which dimension forced full scoring — pass `--override` alongside it so the hard-override
+check runs where it belongs, ahead of the arithmetic.
