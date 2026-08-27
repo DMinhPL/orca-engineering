@@ -49,6 +49,11 @@ optimisation.
     "tests/auth/**"
   ],
 
+  "knowledge_sources": {
+    "gitnexus": {"available": true, "repo": "horse-racing", "commits_behind": 0},
+    "knowns":   {"available": false}
+  },
+
   "escalate_to_lead_when": [
     "a needed change falls outside the allowlist",
     "the same material failure occurs twice",
@@ -74,6 +79,11 @@ optimisation.
   following the protocol.
 - **`file_allowlist`** — annotate every entry with `change_kind`. "modify — register
   provider only" constrains far more than "modify", and constraint is the point.
+- **`knowledge_sources`** — Lead detects availability once at classification and
+  states it here. `commits_behind` travels with it because a stale graph may not be
+  cited as `confirmed` evidence, and the worker cannot know that on its own. Omitting
+  the field makes three cold workers each re-probe, which is the cost the sources were
+  added to avoid. For QC, remember `by_role.qc` restricts Knowns but not GitNexus.
 
 ### Rejecting an incomplete envelope
 
@@ -118,9 +128,24 @@ avoid. Five lines carry the same contract:
   "open_questions": [
     "AC-05 requires automatic linking. Every automatic path I can construct is an account-takeover vector. Needs a decision."
   ],
-  "recommended_next_action": "raise change request; AC-05 is a requirement gap, not an implementation defect"
+  "recommended_next_action": "raise change request; AC-05 is a requirement gap, not an implementation defect",
+
+  "band_challenge": {
+    "observed_band": "L",
+    "dimensions_that_moved": "d5 2->3, d3 2->3",
+    "evidence": "account linking touches the session model and two auth paths; no existing integration harness for the OAuth callback",
+    "evidence_level": "confirmed"
+  }
 }
 ```
+
+`band_challenge` is optional and belongs only in a report that actually has one. Raise
+it on the **first read**, before substantive work — the other `rescore_triggers` all
+require the mis-scoring to have already cost something, and this one exists so it does
+not have to. It is evidence for Lead to arbitrate: the worker does not adjust its own
+tier, effort or model on the strength of it. If the challenge would reach band L/XL or
+match a hard override, gate G1 should have fired before the phase, so the worker stops
+and waits rather than writing past a gate that never ran.
 
 `status` is `complete` · `partial` · `blocked` · `escalated`.
 

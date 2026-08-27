@@ -78,8 +78,10 @@ the YAML wins and the skill file is the bug —
 | `references/handoff-protocol.md` | Dispatch/return envelopes and delta-only context |
 | `references/pmbok-mapping.md` | Traceability to PMBOK 8th, the Agile Practice Guide, and PMI's AI standard |
 | `scripts/complexity_score.py` | Deterministic complexity scorer |
-| `scripts/lint_config.py` | Fails the build when a value is restated outside the YAML |
-| `REVIEW.md` / `REVIEW-workflows.md` | Design review history — what changed between config versions and why |
+| `scripts/lint_config.py` | Fails the build when a value is restated outside the YAML, or the changelog drifts from the config |
+| `scripts/retro_report.py` | Aggregates `decisions.jsonl` across tasks — escalation rate, allowlist amendments, requirement-gap change requests, upward re-scores |
+| `CHANGELOG.md` | Version history for `agents-models.yaml` |
+| `REVIEW.md` / `REVIEW-workflows.md` | Design review findings behind the v13 and v14 changes |
 
 ## Workflow modes
 
@@ -107,6 +109,6 @@ detail on when each applies and which gates it emphasises:
 
 ## Status
 
-Config `schema_version: 3`, `config_version: 15`. See [`REVIEW.md`](REVIEW.md) and
-[`REVIEW-workflows.md`](REVIEW-workflows.md) for the review history behind the
-current design.
+Config `schema_version: 3`, `config_version: 20` — see [`CHANGELOG.md`](CHANGELOG.md)
+for the version history, and [`REVIEW.md`](REVIEW.md) /
+[`REVIEW-workflows.md`](REVIEW-workflows.md) for the design review findings behind it.

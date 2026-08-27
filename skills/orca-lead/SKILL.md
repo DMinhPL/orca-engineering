@@ -80,6 +80,26 @@ find a band that was set too low.
 whether the fast path applies; without `--triage` it scores all seven. Use it when
 two Leads must land on the same band for the same request.
 
+### Detect the knowledge sources — once, here
+
+`knowledge_sources.detect: once_per_task_at_classification`. Probe GitNexus and Knowns
+now and put the result in **every** dispatch envelope. Detect once, not once per
+worker: three cold workers each discovering availability for themselves is three times
+the cost of you doing it once, which defeats the reason the sources exist.
+
+Availability is **detected, never assumed**. A missing source is not a blocker — the
+worker falls back to reading directly — but it must be recorded, because "BA scanned
+the repo by hand" and "BA queried a fresh graph" are different evidence levels for the
+same claim.
+
+For GitNexus, record `commits_behind` alongside availability. A stale index may not be
+cited as `confirmed` evidence by anyone downstream, and you are the one who knows it is
+stale. Offer a re-analyze when staleness would change a gate or an allowlist.
+
+You may use `context`, `impact` and `route_map` yourself as **sizing input** for d1, d3
+and d4. That is the boundary: it informs the band you assign. It does not become you
+performing BA's blast-radius analysis — see `lead_authority_boundary`.
+
 ### 3. Select mode and profile
 
 The band suggests both. `default_mode_by_type` gives the type's baseline. Downgrading
@@ -183,13 +203,45 @@ Read the return envelope against the contract you issued. The questions, in orde
    satisfy an acceptance criterion.
 4. Do two specialists' reports conflict? That is a `lead` escalation condition, and
    the resolution is yours — not a third opinion from a fourth worker.
+5. Is there a `band_challenge`? You scored the task before anyone read the code; the
+   specialist did read it. Either re-score and record both scores, or **record why
+   not** — `complexity_assessment.band_challenge.lead_must`. Silently ignoring one is
+   the failure mode this field was added to prevent, because the alternative route for
+   that information is an allowlist overrun two phases later.
+
+**On band challenges.** Treat them as evidence to arbitrate, not as a vote. The
+specialist does not set the band, because the band sets that specialist's tier, effort
+and gates — but they are the first person in the pod to see the actual code, and you
+are not. A challenge that would reach L/XL or match a hard override means G1 should
+have fired before that phase; the worker stops and waits, so answer it promptly. Expect
+these most often from QC on `d5`, which is the dimension most commonly under-scored,
+and take a Pass-with-challenge as seriously as a Fail — it is the calibration data
+`retrospective` needs.
 
 **Escalation discipline.** Escalate only the role that needs more reasoning, only on
-an observed listed condition, one level per trigger, effort before model. For Dev's
-`hard` and `very_hard` levels and BA's and QC's `model_escalation`, you choose
-between preferred and alternative and **record the reason** — that recorded reason is
-the point of the choice existing. After a clean phase, return to the default profile;
-heat does not carry across phases.
+an observed listed condition, one level per trigger. For BA's and QC's
+`model_escalation` you choose between preferred and alternative and **record the
+reason** — that recorded reason is the point of the choice existing. After a clean
+phase, return to the default profile; heat does not carry across phases.
+
+**Diagnose the deficit before picking the knob.** Effort and model are not one ladder.
+Effort buys reasoning on a scope already understood; a bigger model buys the
+understanding itself. Dev's chain makes these siblings, not steps —
+`scoped_deeper_reasoning` (luna, higher effort) versus `broader_capability` (terra,
+*lower* effort). Read the worker's reported condition to tell them apart:
+`implementation_needs_deeper_reasoning` is the first;
+`required_context_exceeds_current_scope` or `unfamiliar_codepath` is the second.
+Spending effort on a model that cannot see the whole picture buys nothing.
+
+Two rungs bypass the ladder: `hard` is entered directly when `d3 >= 2` or a hard
+override matched. A dangerous change does not climb up from cheap.
+
+**Carry the findings forward.** `dev.escalation_policy.do_not_restart_discovery_after
+_escalation`. The escalated worker boots cold, so put the prior worker's findings —
+affected files, symbols, contracts, what was ruled out — into the new envelope.
+Findings, not transcripts. This is Dev→Dev only: a QC dispatch never receives carried
+context, because `qc_policy.context_mode` is `delta_only` and Dev's reasoning is
+forbidden to it.
 
 **Stop discipline.** `rework_stop_conditions.same_material_failure_limit: 2`. On the
 second material failure of the same thing, the code is not the problem — the

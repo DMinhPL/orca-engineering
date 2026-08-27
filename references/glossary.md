@@ -86,6 +86,26 @@ descriptive; the normative values (bands, tiers, gate conditions) live in
 - **Rework loop** — the cycle when QC returns Fail/Blocked: Lead classifies the
   finding (technical fix, requirement gap, business decision, or invalid), routes it,
   and re-dispatches QC fresh after the fix — never as a continuation.
+- **Worktree** — a registered Git worktree: an isolated working directory checked out
+  from the same repository, used to give a specialist phase its own branch state
+  without cloning. Not a full clone, and not the same permission as reusing a
+  *session* — worktree reuse and session reuse are granted separately. Primary is
+  never part of the reusable worktree pool. See `worktree_selection_policy` and
+  workflows.md §1.9.
+
+## Knowledge sources
+
+- **GitNexus** — a code knowledge graph built by static analysis and queried over MCP.
+  Authoritative for architecture, dependencies, call chains, and impacted files; not a
+  source for requirements or intent. Queried before broad repository scanning.
+- **Knowns** — project memory: prior decisions, architecture notes, task history,
+  earlier implementations. Authoritative for *why* something was decided; not for what
+  the code currently is.
+- **Freshness / `commits_behind`** — how far a GitNexus index lags HEAD. A stale index
+  may never be cited as `confirmed` evidence; its claims are tagged `hypothesis`.
+- **Availability gating** — both sources are detected by Lead once per task and
+  declared in the dispatch envelope. Missing is never a blocker; it falls back to
+  direct reading and is recorded.
 
 ## External standards referenced
 

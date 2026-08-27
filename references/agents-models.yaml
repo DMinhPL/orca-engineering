@@ -1,35 +1,15 @@
 schema_version: 3
-config_version: 16
+config_version: 22
 
 # Central provider/model/effort configuration for the four-agent Orca workflow.
 # Per-task user overrides take precedence over these defaults.
 # Exact identifiers must exist in the local Claude/Codex CLIs used by Orca.
 # Defaults are intentionally optimized for lower token usage. Escalate only when needed.
 #
-# v13 changes (see REVIEW.md for rationale):
-#   + complexity_assessment   sizing rubric that drives profile and mode selection
-#   + modification_policy     write-permission tiers, allowlist, protected paths
-#   + human_gates             enumerated user-approval points
-#   + change_control          classes, authority, propagation
-#   + traceability            ID scheme and RTM obligation
-#   + defect_severity         resolves the dangling p0 reference in documentation.status_gate
-#   + evidence_policy         binds engineering_policy.evidence_levels to where they apply
-#   + budgets                 measurable ceilings behind optimization.objective
-#   ~ workflow_modes          review_fix differentiated from simple; type→mode defaults added
-#   ~ agents.ba.escalation    model escalation added alongside effort
-#   ~ documentation.files     qc report, decision log, risk section
-#
-# v15 changes:
-#   + complexity_assessment.triage
-#       progressive scoring — d2/d3/d7 first, full seven only when the triple is
-#       non-zero. Additive and backward compatible: set enabled: false to restore
-#       unconditional seven-dimension scoring.
-#
-# v16 changes:
-#   ~ modification_policy.branch_pattern -> modification_policy.branch_naming
-#       category/slug[-ticket], category derived from the task type rather than
-#       chosen freely. BREAKING for anyone parsing branch_pattern: the branch no
-#       longer carries {task_id}; commit messages still do, via [TASK-####].
+# Version history lives in CHANGELOG.md, not here. Bumping config_version without an
+# entry there fails scripts/lint_config.py (C7). Inline `# vNN` markers below are kept
+# deliberately — they explain why a specific line looks the way it does, which is
+# rationale rather than history.
 
 agents:
   lead:
@@ -50,9 +30,9 @@ agents:
       - release_risk_routing
       - evidence_level_governance
       - choose_complexity_profile
-      - score_complexity                  # v13: run complexity_assessment before mode choice
-      - grant_modification_tier           # v13: issue write permission and file allowlist
-      - own_human_gates                   # v13: raise and record G1-G6
+      - score_complexity # v13: run complexity_assessment before mode choice
+      - grant_modification_tier # v13: issue write permission and file allowlist
+      - own_human_gates # v13: raise and record G1-G6
       - approve_ba_research
       - review_development_report
       - review_qc_report
@@ -67,14 +47,20 @@ agents:
         - multiple_specialist_reports_conflict
         - cross_system_architecture_decision
         - repeated_worker_failure
-        - complexity_band_is_L_or_XL      # v13
+        - complexity_band_is_L_or_XL # v13
 
   ba:
     display_name: BA / Research
     role: research
-    provider: codex
-    model: gpt-5.5
-    effort: high
+    # v20: moved from codex/gpt-5.5. Three of four roles were on codex (lead, ba,
+    # dev) against one on claude (qc), and qc is the role deliberately kept lightest
+    # by context_mode: delta_only. BA is the second-heaviest consumer and the only
+    # heavy role with no independence constraint — the sole structural rule is
+    # dev != qc. Moving it gives 2:2 by role. See qc_policy.independence for why
+    # sharing a family with QC is accepted rather than overlooked.
+    provider: claude
+    model: claude-sonnet-5
+    effort: medium
     configurable: true
     allow_model_override: true
     allow_effort_override: true
@@ -86,27 +72,40 @@ agents:
       - acceptance_criteria
       - risk_analysis
       - identify_open_questions
-      - propose_file_allowlist            # v13: BA proposes, Lead grants
-      - blast_radius_analysis             # v13: callers, constructors, contracts, partial rollout
+      - propose_file_allowlist # v13: BA proposes, Lead grants
+      - blast_radius_analysis # v13: callers, constructors, contracts, partial rollout
     escalation:
       # v13: effort-only escalation was insufficient for a role that owns
       # architecture_analysis. Model escalation is now available on the
       # architecture and cross-system conditions.
-      effort: xhigh
+      # v18: was xhigh, which became a two-level jump once the default dropped to
+      # medium — a breach of one_escalation_level_per_trigger. medium -> high ->
+      # model_escalation is also monotonic; the old high -> xhigh -> terra@high
+      # walked effort back down at the model step.
+      effort: high
       when:
         - architecture_complexity_high
         - cross_system_change
         - requirements_conflict
         - requirements_are_materially_ambiguous
         - repeated_analysis_failure
+        # v18: BA's other conditions all need someone to judge that they apply.
+        # This one is mechanical, mirroring lead.escalation.complexity_band_is_L_or_XL,
+        # so a hard task cannot run under-powered because nobody called it complex.
+        - complexity_band_is_L_or_XL
       model_escalation:
+        # v20: preferred is now cross-family. The old alternative (claude-sonnet-5)
+        # became the default in v20 and was therefore no longer an escalation at all.
+        # Escalating across families is the point here: a hard architecture question
+        # benefits more from a different reading than from the same reading enlarged.
+        # It also keeps BA a working path when one provider is unavailable.
         preferred:
           provider: codex
           model: gpt-5.6-terra
           effort: high
         alternative:
           provider: claude
-          model: claude-sonnet-5
+          model: claude-opus-5
           effort: high
         selection_policy: lead_selects_one_and_records_reason
         when:
@@ -137,60 +136,111 @@ agents:
       - development_document
       - follow_approved_requirement
       - report_blockers_to_lead
-      - respect_file_allowlist            # v13
-      - write_rollback_note               # v13, required from tier M2
-      - self_check_against_acceptance_criteria   # v13, evidence not narrative
+      - respect_file_allowlist # v13
+      - write_rollback_note # v13, required from tier M2
+      - self_check_against_acceptance_criteria # v13, evidence not narrative
     execution_policy:
       scope_bounded: true
       repeat_ba_analysis: false
       broad_repo_scan_by_default: false
       focused_validation_first: true
       repeat_successful_checks: false
-      edit_outside_allowlist: forbidden           # v13
-      on_needed_file_outside_allowlist: stop_and_raise_change_request   # v13
-      mix_refactor_and_behavior_in_one_commit: forbidden                # v13
-      disable_or_weaken_test_to_pass: forbidden                         # v13
+      edit_outside_allowlist: forbidden # v13
+      on_needed_file_outside_allowlist: stop_and_raise_change_request # v13
+      mix_refactor_and_behavior_in_one_commit: forbidden # v13
+      disable_or_weaken_test_to_pass: forbidden # v13
+    # v19: Escalation carries evidence forward. fresh_supervised_worker_for_every
+    # _specialist_phase means an escalated Dev boots cold, so without this the
+    # escalation restarts discovery from zero — the single most expensive waste in
+    # the chain, and worse than the model choice it was meant to fix.
+    escalation_policy:
+      evidence_based: true
+      escalate_only_when_execution_produces_evidence: true
+      do_not_restart_discovery_after_escalation: true
+      pass_prior_findings_to_the_escalated_worker: true
+      pass_findings_not_transcripts: true
+      # Dev -> Dev only. QC must never receive carried context: qc_policy
+      # .context_mode is delta_only and dev_implementation_reasoning is forbidden.
+      applies_to: dev_to_dev_escalation_only
+      never_carry_into: [qc_dispatch, ba_dispatch]
+      escalate_when:
+        - confidence_below_threshold
+        - required_context_exceeds_current_scope
+        - implementation_attempt_failed
+        - tests_reveal_unexpected_cross_module_behavior
+        - security_or_data_integrity_risk_detected
+        - contract_impact_uncertain
+        - root_cause_remains_unresolved
+    # v19: Codex-only. The former claude-sonnet-5 / claude-opus-5 alternatives were
+    # unusable in practice: QC is always claude, so either one collided with
+    # qc_policy.independence.qc_provider_must_differ_from_dev_provider and tripped
+    # on_independence_unavailable, capping Dev at M1 — propose-only — at exactly the
+    # moment the task was hardest. Needing Claude for Dev means deliberately moving
+    # QC to codex for that task, never a silent cap.
+    #
+    # scoped_deeper_reasoning and broader_capability are SIBLINGS, not sequential.
+    # Lead picks by which deficit was observed: more thinking on a known scope, or
+    # more capability to understand an unknown one.
     escalation_chain:
-      - level: complex
+      - level: scoped_deeper_reasoning
         provider: codex
         model: gpt-5.6-luna
         effort: high
         when:
-          - complex_coding
-          - multi_module_change
-          - nontrivial_refactor
+          - task_is_still_well_scoped
+          - relevant_files_are_known
+          - no_major_contract_uncertainty
           - implementation_needs_deeper_reasoning
-      - level: hard
-        preferred:
-          provider: codex
-          model: gpt-5.6-terra
-          effort: high
-        alternative:
-          provider: claude
-          model: claude-sonnet-5
-          effort: high
-        selection_policy: lead_selects_one_and_records_reason
+          - complex_coding
+      - level: broader_capability
+        provider: codex
+        model: gpt-5.6-terra
+        effort: medium
         when:
+          - luna_failed_or_low_confidence
+          - unfamiliar_codepath
+          - multi_module_change
+          - deeper_codebase_discovery
+          - nontrivial_contract_analysis
+          - broad_change_impact
+          - compatibility_uncertainty
+          - required_context_exceeds_current_scope
+      - level: complex
+        provider: codex
+        model: gpt-5.6-terra
+        effort: high
+        when:
+          - terra_medium_insufficient
           - difficult_root_cause
+          - nontrivial_refactor
+          - cross_module_behavior
+          - complex_state_or_async_flow
+      - level: hard
+        provider: codex
+        model: gpt-5.6-sol
+        effort: high
+        # v19: entered directly, skipping lower rungs, when the CAS blast-radius
+        # dimension or a hard override already says the change is dangerous. The
+        # existing d3 scale is the blast-radius taxonomy; there is not a second one.
+        minimum_rung_when: [d3_is_2_or_higher, hard_override_matched]
+        when:
           - architecture_heavy_implementation
           - concurrency_or_race_condition
           - distributed_system_change
           - security_critical_implementation
+          - data_integrity_risk
+          - complex_failure_mode_analysis
       - level: very_hard
-        preferred:
-          provider: codex
-          model: gpt-5.6-sol
-          effort: high
-        alternative:
-          provider: claude
-          model: claude-opus-5
-          effort: high
-        selection_policy: lead_selects_one_and_records_reason
+        provider: codex
+        model: gpt-5.6-sol
+        effort: xhigh
         when:
-          - repeated_implementation_failure
           - hard_level_failed
+          - repeated_implementation_failure
           - exceptionally_complex_debugging
           - exceptionally_complex_refactor
+          - architecture_reconsideration
+          - multiple_failed_approaches
 
   qc:
     display_name: QC / Reviewer
@@ -216,7 +266,7 @@ agents:
       - review_changed_behavior
       - quality_risk_analysis
       - report_defects_to_lead
-      - verify_allowlist_compliance       # v13: scope-drift detection is a QC finding
+      - verify_allowlist_compliance # v13: scope-drift detection is a QC finding
     escalation:
       effort: high
       when:
@@ -244,15 +294,15 @@ complexity_assessment:
   enabled: true
   scored_by: lead
   scored_at: classification
-  score_effort: default            # scoring must never be the expensive step
-  dimensions:                      # each 0-3
-    d1_scope_breadth:            files and modules touched
-    d2_requirement_ambiguity:    how much is unknown about the WHAT
-    d3_blast_radius:             what breaks if this is wrong
-    d4_integration_surface:      external parties that must agree
-    d5_verification_difficulty:  how hard to prove it works
-    d6_novelty:                  precedent in this repository
-    d7_reversibility:            cost of undo
+  score_effort: default # scoring must never be the expensive step
+  dimensions: # each 0-3
+    d1_scope_breadth: files and modules touched
+    d2_requirement_ambiguity: how much is unknown about the WHAT
+    d3_blast_radius: what breaks if this is wrong
+    d4_integration_surface: external parties that must agree
+    d5_verification_difficulty: how hard to prove it works
+    d6_novelty: precedent in this repository
+    d7_reversibility: cost of undo
   # v15: Progressive scoring. Scoring seven dimensions on a typo fix is ceremony
   # spent to discover that no ceremony was needed. d2/d3/d7 carry the safety
   # signal; d1/d4/d5/d6 tune profile and effort and rarely change a safety
@@ -278,12 +328,42 @@ complexity_assessment:
     # the d3 = 0 condition is ever loosened, d5 must rejoin the triage set.
     d5_omission_valid_only_while: d3_is_zero_in_fast_path
   bands:
-    XS: { range: [0, 3],   workflow_mode: simple,   complexity_profile: simple,  max_modification_tier: M2 }
-    S:  { range: [4, 7],   workflow_mode: simple,   complexity_profile: simple,  max_modification_tier: M2 }
-    M:  { range: [8, 12],  workflow_mode: standard, complexity_profile: normal,  max_modification_tier: M3 }
-    L:  { range: [13, 16], workflow_mode: standard, complexity_profile: complex, max_modification_tier: M3 }
-    XL: { range: [17, 21], workflow_mode: standard, complexity_profile: complex, max_modification_tier: M4,
-          action: decompose_into_child_tasks_and_rescore }
+    XS:
+      {
+        range: [0, 3],
+        workflow_mode: simple,
+        complexity_profile: simple,
+        max_modification_tier: M2,
+      }
+    S:
+      {
+        range: [4, 7],
+        workflow_mode: simple,
+        complexity_profile: simple,
+        max_modification_tier: M2,
+      }
+    M:
+      {
+        range: [8, 12],
+        workflow_mode: standard,
+        complexity_profile: normal,
+        max_modification_tier: M3,
+      }
+    L:
+      {
+        range: [13, 16],
+        workflow_mode: standard,
+        complexity_profile: complex,
+        max_modification_tier: M3,
+      }
+    XL:
+      {
+        range: [17, 21],
+        workflow_mode: standard,
+        complexity_profile: complex,
+        max_modification_tier: M4,
+        action: decompose_into_child_tasks_and_rescore,
+      }
   hard_overrides:
     # Any match forces band >= L, complexity_profile complex, and human gate G1.
     effect: { min_band: L, complexity_profile: complex, require_gate: G1 }
@@ -306,7 +386,38 @@ complexity_assessment:
     - blocking_open_question_discovered_after_dispatch
     - same_material_failure_limit_reached
     - approved_change_request_alters_scope
+    # v21: the other four all require the mis-scoring to have already cost something —
+    # an overrun, a repeated failure, a blocked question. A specialist who reads the
+    # code and can see on day one that the band is wrong had no way to say so until
+    # the error produced damage. Lead scores from the request text and a shallow look;
+    # the specialist is the first person in the pod to actually read the code.
+    - specialist_reports_band_materially_wrong_on_first_read
   rescore_policy: record_both_scores_and_dimensions_moved
+  # v21: how the trigger above is raised. Deliberately evidence, not a vote — the
+  # specialist whose tier, effort and gates the band determines does not get to set
+  # it. Scoring stays with Lead; what changes is that Lead now hears the objection
+  # before it becomes an allowlist overrun.
+  band_challenge:
+    raisable_by: [ba, dev, qc]
+    raise_in: return_envelope.band_challenge
+    timing: first_read_before_substantive_work
+    required_fields:
+      [observed_band, dimensions_that_moved, evidence, evidence_level]
+    decided_by: lead
+    lead_must:
+      - rescore_or_record_why_not
+      - record_both_scores_when_rescoring
+    specialist_may_not:
+      - self_adjust_modification_tier
+      - self_adjust_effort_or_model
+      - proceed_as_if_the_rescore_were_granted
+    # A challenge that would raise the band to L/XL or match a hard override implies
+    # gate G1 should have fired before this phase. Continuing would write past a gate
+    # that never ran, so that case stops. Every other case continues under the tier
+    # already granted, which is the conservative direction: a lower band grants less
+    # write authority, not more.
+    if_challenge_implies_an_ungated_human_gate: stop_and_await_lead
+    otherwise_while_awaiting_lead: continue_under_the_granted_tier_and_note_it
 
 # ─────────────────────────────────────────────────────────────
 # v13: Modification policy — write permission is granted, not assumed
@@ -316,23 +427,56 @@ modification_policy:
   granted_by: lead
   granted_in: dispatch_envelope
   tiers:
-    M0: { write: none,             description: read and analyze only }
-    M1: { write: proposal_only,    description: produce a reviewable diff without applying it }
-    M2: { write: allowlist_only,   description: apply edits to named files on a work branch,
-          requires: [file_allowlist, work_branch, rollback_note] }
-    M3: { write: structural,       description: create or move files, change internal interfaces, add dependency,
-          requires: [file_allowlist, work_branch, rollback_note, decision_record] }
-    M4: { write: baseline,         description: schema, public API, security config, infra, licensing,
-          requires: [file_allowlist, work_branch, rollback_note, decision_record, human_gate_G2],
-          human_approval_before_any_write: true }
+    M0: { write: none, description: read and analyze only }
+    M1:
+      {
+        write: proposal_only,
+        description: produce a reviewable diff without applying it,
+      }
+    M2:
+      {
+        write: allowlist_only,
+        description: apply edits to named files on a work branch,
+        requires: [file_allowlist, work_branch, rollback_note],
+      }
+    M3:
+      {
+        write: structural,
+        description: create or move files,
+        change internal interfaces,
+        add dependency,
+        requires: [file_allowlist, work_branch, rollback_note, decision_record],
+      }
+    M4:
+      {
+        write: baseline,
+        description: schema,
+        public API,
+        security config,
+        infra,
+        licensing,
+        requires:
+          [
+            file_allowlist,
+            work_branch,
+            rollback_note,
+            decision_record,
+            human_gate_G2,
+          ],
+        human_approval_before_any_write: true,
+      }
   tier_selection:
-    - { condition: no_approved_requirement_yet,        min_tier: M1 }
-    - { condition: change_surface_exceeds_one_file,    min_tier: M1 }
-    - { condition: protected_path_in_change_surface,   min_tier: M1, require_gate: G2 }
-    - { condition: new_or_deleted_or_moved_file,       min_tier: M3 }
-    - { condition: new_third_party_dependency,         min_tier: M3, require_gate: G2 }
-    - { condition: schema_or_public_api_or_infra,      min_tier: M4 }
-    - { condition: irreversible_or_destructive,        min_tier: M4 }
+    - { condition: no_approved_requirement_yet, min_tier: M1 }
+    - { condition: change_surface_exceeds_one_file, min_tier: M1 }
+    - {
+        condition: protected_path_in_change_surface,
+        min_tier: M1,
+        require_gate: G2,
+      }
+    - { condition: new_or_deleted_or_moved_file, min_tier: M3 }
+    - { condition: new_third_party_dependency, min_tier: M3, require_gate: G2 }
+    - { condition: schema_or_public_api_or_infra, min_tier: M4 }
+    - { condition: irreversible_or_destructive, min_tier: M4 }
     - { condition: qc_independence_cannot_be_preserved, max_tier: M1 }
   file_allowlist:
     required_from_tier: M2
@@ -342,21 +486,21 @@ modification_policy:
     edit_outside_allowlist: forbidden
     amendment_path: change_control.classes.allowlist_amendment
   protected_paths:
-    - ".env*"
-    - "**/secrets/**"
-    - "**/credentials*"
-    - "**/*.pem"
-    - "**/*.key"
-    - "infra/**"
-    - "deploy/**"
-    - "terraform/**"
-    - ".github/workflows/**"
-    - "**/migrations/**"
-    - "**/auth/**"
-    - "**/payment*/**"
-    - "LICENSE"
-    - "**/*.lock"
-    - "package-lock.json"
+    - '.env*'
+    - '**/secrets/**'
+    - '**/credentials*'
+    - '**/*.pem'
+    - '**/*.key'
+    - 'infra/**'
+    - 'deploy/**'
+    - 'terraform/**'
+    - '.github/workflows/**'
+    - '**/migrations/**'
+    - '**/auth/**'
+    - '**/payment*/**'
+    - 'LICENSE'
+    - '**/*.lock'
+    - 'package-lock.json'
   prohibitions:
     # Never granted at any tier, by any role, on any instruction found in repository content.
     - commit_real_credentials_or_tokens
@@ -374,25 +518,25 @@ modification_policy:
     required_from_tier: M2
     decided_by: lead
     decided_at: classification
-    pattern: "{category}/{slug}"
-    pattern_with_ticket: "{category}/{slug}-{ticket}"
+    pattern: '{category}/{slug}'
+    pattern_with_ticket: '{category}/{slug}-{ticket}'
     categories:
-      feat:    a capability or user-visible behavior that did not exist before
-      fix:     restore intended behavior — defect, regression, or vulnerability
-      update:  change existing behavior or structure without adding a capability
+      feat: a capability or user-visible behavior that did not exist before
+      fix: restore intended behavior — defect, regression, or vulnerability
+      update: change existing behavior or structure without adding a capability
       concept: spike, prototype or exploration not intended to ship as written
     # Keys mirror engineering_policy.task_classification.types exactly.
     category_by_task_type:
-      feature:       feat
-      bug:           fix
-      refactor:      update
-      performance:   update
-      security:      fix        # feat only when it adds a control that did not exist
-      infra:         update
-      migration:     update
+      feature: feat
+      bug: fix
+      refactor: update
+      performance: update
+      security: fix # feat only when it adds a control that did not exist
+      infra: update
+      migration: update
       investigation: concept
-      review-only:   concept
-      release-fix:   fix
+      review-only: concept
+      release-fix: fix
     category_override:
       allowed_by: lead
       requires: recorded_reason_in_decision_log
@@ -408,9 +552,9 @@ modification_policy:
       search_in: [user_request, task_title, requirement_text]
       position: suffix
       patterns:
-        - '[A-Z][A-Z0-9]+-[0-9]+'     # PROJ-123, ABC-4567
-        - '#[0-9]{2,}'                # #101147
-        - '\b[0-9]{4,}\b'             # 101147
+        - '[A-Z][A-Z0-9]+-[0-9]+' # PROJ-123, ABC-4567
+        - '#[0-9]{2,}' # #101147
+        - '\b[0-9]{4,}\b' # 101147
       normalize: lowercase_and_strip_hash
       when_multiple: use_the_id_the_work_is_filed_under_and_record_the_others
       when_absent: omit_suffix_entirely
@@ -424,7 +568,7 @@ modification_policy:
       - category_outside_the_categories_map
       - ticket_repeated_in_both_slug_and_suffix
       - rename_after_first_push
-  forbid_direct_commit_to: [main, master, "release/*"]
+  forbid_direct_commit_to: [main, master, 'release/*']
   rollback_note:
     required_from_tier: M2
     written_before_apply: true
@@ -436,19 +580,26 @@ modification_policy:
 # ─────────────────────────────────────────────────────────────
 human_gates:
   blocking_semantics: pod_may_continue_non_dependent_analysis_but_not_the_governed_writes
-  request_format: [recommendation, reason, material_risk, reversal_path, one_open_question]
+  request_format:
+    [recommendation, reason, material_risk, reversal_path, one_open_question]
   gates:
     G1_scope_approval:
       when: [band_is_L_or_XL, hard_override_matched]
       before_phase: dev
     G2_write_authorization:
-      when: [tier_is_M4, tier_is_M3_and_protected_path, new_third_party_dependency]
+      when:
+        [tier_is_M4, tier_is_M3_and_protected_path, new_third_party_dependency]
       before_phase: dev
     G3_ambiguity_resolution:
       when: [blocking_open_question_survives_one_ba_pass]
       before_phase: dev
     G4_escalation_ceiling:
-      when: [same_material_failure_limit_reached, budget_exhausted, escalation_chain_exhausted]
+      when:
+        [
+          same_material_failure_limit_reached,
+          budget_exhausted,
+          escalation_chain_exhausted,
+        ]
       before_phase: any
     G5_acceptance:
       when: [band_is_M_or_above]
@@ -472,23 +623,23 @@ engineering_policy:
       - release-fix
     # v13: previously Lead had to infer the mode from the type with no stated default.
     default_mode_by_type:
-      feature:        standard
-      bug:            standard        # simple only if reproduction and expected behavior are confirmed
-      refactor:       standard
-      performance:    standard
-      security:       standard        # hard override applies; never simple
-      infra:          standard        # hard override applies
-      migration:      standard        # hard override applies
-      investigation:  research_only
-      review-only:    qc_only
-      release-fix:    review_fix
+      feature: standard
+      bug: standard # simple only if reproduction and expected behavior are confirmed
+      refactor: standard
+      performance: standard
+      security: standard # hard override applies; never simple
+      infra: standard # hard override applies
+      migration: standard # hard override applies
+      investigation: research_only
+      review-only: qc_only
+      release-fix: review_fix
     # v14: review_fix and defect_triage share the `bug` type; the entry condition
     # decides. Lead picks defect_triage when expected behavior is not yet established.
     mode_selection_within_type:
       bug:
-        - { mode: review_fix,    when: defect_and_expected_behavior_already_clear }
+        - { mode: review_fix, when: defect_and_expected_behavior_already_clear }
         - { mode: defect_triage, when: expected_behavior_or_root_cause_unclear }
-        - { mode: standard,      when: fix_requires_new_business_rules }
+        - { mode: standard, when: fix_requires_new_business_rules }
     mode_downgrade_allowed_when: requirement_is_explicit_and_confirmed_and_band_is_XS_or_S
     mode_downgrade_forbidden_when: hard_override_matched
   evidence_levels:
@@ -519,17 +670,26 @@ engineering_policy:
   # v13: requirement_traceability was a QC responsibility with no artifact behind it.
   traceability:
     id_schemes:
-      requirement: "REQ-##"
-      acceptance_criterion: "AC-##"
-      risk: "R-##"
-      defect: "D-##"
-      change_request: "CR-##"
-      decision_record: "DR-###"
-      test_case: "TC-##"
+      requirement: 'REQ-##'
+      acceptance_criterion: 'AC-##'
+      risk: 'R-##'
+      defect: 'D-##'
+      change_request: 'CR-##'
+      decision_record: 'DR-###'
+      test_case: 'TC-##'
     matrix:
       required_from_band: M
-      path: "{documentation.root}/{folder}/traceability.csv"
-      columns: [req_id, description, acceptance_criteria, files, test_cases, evidence_level, status]
+      path: '{documentation.root}/{folder}/traceability.csv'
+      columns:
+        [
+          req_id,
+          description,
+          acceptance_criteria,
+          files,
+          test_cases,
+          evidence_level,
+          status,
+        ]
     obligations:
       every_acceptance_criterion_has_a_test: true
       every_changed_file_traces_to_a_requirement: true
@@ -545,7 +705,7 @@ engineering_policy:
     same_material_failure_limit: 2
     missing_requirement_requires_decision: true
     escalate_with_recorded_reason: true
-    on_limit_reached: raise_gate_G4_and_return_to_ba_or_lead_planning   # v13
+    on_limit_reached: raise_gate_G4_and_return_to_ba_or_lead_planning # v13
 
 # ─────────────────────────────────────────────────────────────
 # v13: Budgets — the measurable form of optimization.objective
@@ -555,9 +715,12 @@ budgets:
   on_exhaustion: stop_and_report_to_user_via_lead
   report_fields: [what_was_attempted, what_was_learned, revised_band, options]
   by_profile:
-    simple:  { dev_dispatches: 2, qc_dispatches: 2, escalations: 1, ba_dispatches: 1 }
-    normal:  { dev_dispatches: 3, qc_dispatches: 3, escalations: 2, ba_dispatches: 2 }
-    complex: { dev_dispatches: 4, qc_dispatches: 4, escalations: 3, ba_dispatches: 3 }
+    simple:
+      { dev_dispatches: 2, qc_dispatches: 2, escalations: 1, ba_dispatches: 1 }
+    normal:
+      { dev_dispatches: 3, qc_dispatches: 3, escalations: 2, ba_dispatches: 2 }
+    complex:
+      { dev_dispatches: 4, qc_dispatches: 4, escalations: 3, ba_dispatches: 3 }
   de_escalation:
     return_to_default_after_clean_phase: true
     heat_does_not_carry_across_phases: true
@@ -569,21 +732,32 @@ qc_policy:
     - relevant_ba_requirement_sections
     - relevant_dev_development_sections
     - concise_test_results
-    - file_allowlist                    # v13: needed to detect scope drift
-    - acceptance_criteria               # v13: QC verifies against these, not against the diff
+    - file_allowlist # v13: needed to detect scope drift
+    - acceptance_criteria # v13: QC verifies against these, not against the diff
+    - targeted_knowledge_source_queries # v17: see knowledge_sources.by_role.qc
   forbidden_context_by_default:
-    - full_repository_scan
+    - full_repository_scan # v17: a targeted graph query is NOT this
     - full_ba_transcript
     - full_dev_transcript
     - full_successful_test_logs
     - unrelated_files
-    - dev_implementation_reasoning      # v13: seeing the reasoning shapes the tests to the code
+    - dev_implementation_reasoning # v13: seeing the reasoning shapes the tests to the code
   independence:
     # v13: makes explicit what the provider split already achieves structurally.
     qc_provider_must_differ_from_dev_provider: true
     test_design_derived_from: acceptance_criteria
     test_design_derived_from_diff: forbidden
     on_independence_unavailable: cap_modification_tier_at_M1
+    # v20: BA moved to claude, so BA and QC now share a provider and a model. This
+    # is accepted, not overlooked. QC receives BA's written acceptance criteria —
+    # a user-approved artifact — and never BA's analysis reasoning, so the failure
+    # mode that dev != qc prevents does not apply here. The residual risk is that
+    # one family may be blind when verifying an ambiguity it was blind to when
+    # writing; the mitigation is that a human confirms the criteria before Dev
+    # starts. If retrospectives show criteria defects surviving to QC, split this.
+    ba_provider_may_match_qc_provider: true
+    ba_qc_shared_family_is_deliberate: true
+    revisit_if: acceptance_criteria_defects_are_systematically_missed_by_qc
   testing:
     max_attempts_per_dispatch: 1
     allow_transient_retry_without_lead: false
@@ -608,7 +782,7 @@ qc_policy:
       - affected_lines
       - command
       - error_excerpt
-      - severity                        # v13, from engineering_policy.defect_severity
+      - severity # v13, from engineering_policy.defect_severity
       - recommended_next_action
   authority:
     may_fix_code: false
@@ -617,7 +791,7 @@ qc_policy:
     may_contact_ba_directly: false
     must_wait_for_lead_after_failure: true
     revalidation_requires_new_lead_dispatch: true
-    may_raise_change_request_to_lead: true      # v13: a requirement gap found in QC needs a path
+    may_raise_change_request_to_lead: true # v13: a requirement gap found in QC needs a path
 
 communication:
   allow:
@@ -677,7 +851,8 @@ change_control:
       authority: user_gate_G2
       writes_before_approval: forbidden
       artifact: change_request
-  impact_assessment_fields: [scope, schedule, cost, resources, risk, quality, rescore]
+  impact_assessment_fields:
+    [scope, schedule, cost, resources, risk, quality, rescore]
   dispositions: [approved, rejected, deferred, more_information_needed]
   propagation_checklist:
     - requirement_document
@@ -726,7 +901,12 @@ workflow_modes:
     # by sequence. Use defect_triage when the defect is not yet characterized.
     description: Code-review or bug-fix work where the defect and expected behavior are already clear enough that separate BA analysis would duplicate context.
     entry_condition: defect_and_expected_behavior_already_clear
-    qc_emphasis: [regression_analysis, missing_change_surface_detection, change_impact_verification]
+    qc_emphasis:
+      [
+        regression_analysis,
+        missing_change_surface_detection,
+        change_impact_verification,
+      ]
     flow:
       - lead
       - dev
@@ -799,6 +979,120 @@ workflow_modes:
       - lead
       - user
 
+# ─────────────────────────────────────────────────────────────
+# v17: Knowledge sources — optional external context providers.
+# Availability-gated: detected per task, never assumed. A missing source falls
+# back to ordinary reading and is never a blocker. The economy case is real — a
+# targeted query replaces a scan-and-read loop — but it only pays if what reaches
+# a worker is the finding, not the raw tool output.
+# ─────────────────────────────────────────────────────────────
+knowledge_sources:
+  enabled: true
+  detect: once_per_task_at_classification
+  detected_by: lead
+  on_unavailable: fall_back_to_direct_reading_and_record_which_source_was_missing
+  never:
+    - assume_availability
+    - block_the_task_on_a_missing_source
+    - silently_skip_the_fallback
+
+  gitnexus:
+    kind: code_knowledge_graph
+    use_for:
+      - architecture
+      - dependencies
+      - call_chains
+      - impacted_files
+      - blast_radius
+      - route_and_contract_surface
+    not_a_source_for:
+      [requirements, acceptance_criteria, business_rules, user_intent]
+    order: query_before_broad_repository_scanning
+    freshness:
+      check: commits_behind_head_as_reported_by_the_tool
+      fresh_when: zero_commits_behind
+      on_stale:
+        [
+          state_commits_behind_in_the_report,
+          downgrade_evidence_level,
+          offer_reanalyze_to_lead,
+        ]
+      stale_result_as_confirmed_evidence: forbidden
+    evidence_level:
+      when_fresh: confirmed
+      when_stale: hypothesis
+    absence_of_a_finding_is_not_proof_of_absence: true
+
+  knowns:
+    kind: project_memory
+    use_for:
+      - task_context
+      - architecture_decisions
+      - prior_decisions
+      - project_docs
+      - previous_implementation_context
+    not_a_source_for:
+      [current_code_state, the_approved_requirement_once_confirmed]
+    order: query_before_re_deriving_context_from_history
+    authority: authoritative_for_why_and_for_what_was_previously_decided
+
+  precedence:
+    # Highest wins. Knowns is authoritative for WHY; the repository is
+    # authoritative for WHAT IS. A memory that disagrees with the code is a stale
+    # memory — and that disagreement is itself a finding worth reporting.
+    order:
+      - approved_requirement_document
+      - current_repository_state
+      - gitnexus_when_fresh
+      - knowns
+      - model_prior_knowledge
+    on_conflict: report_the_conflict_to_lead_rather_than_silently_picking_one
+
+  by_role:
+    lead:
+      gitnexus: [context, impact, route_map]
+      knowns: [prior_decisions, task_history]
+      purpose: sizing and routing input for CAS d1/d3/d4 and mode selection
+      boundary: informs the band; never becomes Lead performing BA's analysis
+    ba:
+      gitnexus: full
+      knowns: full
+      feeds:
+        [architecture_analysis, blast_radius_analysis, file_allowlist_proposal]
+    dev:
+      gitnexus: full
+      knowns: full
+      feeds: [call_chain_understanding, prior_implementation_precedent]
+    qc:
+      # A targeted graph query is a static read of the code, not Dev's account of
+      # it, so it STRENGTHENS delta-only verification. It is explicitly not a
+      # full_repository_scan.
+      gitnexus: full
+      gitnexus_counts_as_full_repository_scan: false
+      # Knowns can carry Dev's own notes on the current task — exactly the
+      # forbidden context the provider split exists to prevent.
+      knowns: restricted
+      knowns_allowed:
+        [
+          prior_decisions_predating_this_task,
+          requirement_history,
+          architecture_decisions,
+        ]
+      knowns_forbidden:
+        [
+          dev_implementation_reasoning_for_the_current_task,
+          dev_notes_for_the_current_task,
+        ]
+
+  economy:
+    intent: a targeted query replaces a scan-and-read loop
+    counts_against_budgets: true
+    pass_to_workers: findings_and_paths_not_raw_tool_output
+    forbidden:
+      - dumping_raw_query_output_into_a_dispatch_envelope
+      - speculative_querying_without_a_stated_question
+      - re_querying_what_a_prior_phase_already_reported
+
 optimization:
   objective: minimize_token_usage_without_sacrificing_required_quality
   rules:
@@ -809,10 +1103,17 @@ optimization:
     - do_not_repeat_analysis_already_completed_by_another_role
     - pass_concise_handoff_summaries_and_required_artifacts_instead_of_full_transcripts_when_possible
     - keep_simple_tasks_in_simple_mode_when_requirements_are_explicit
+    - prefer_a_targeted_knowledge_source_query_over_a_broad_repository_scan # v17
     - return_to_default_profile_for_later_phases_unless_escalation_is_still_needed
-    - score_complexity_before_choosing_mode_and_never_at_escalated_effort   # v13
-    - escalate_effort_before_escalating_model                               # v13
-    - one_escalation_level_per_trigger_except_hard_overrides                # v13
+    - score_complexity_before_choosing_mode_and_never_at_escalated_effort # v13
+    # v19: was an unconditional escalate_effort_before_escalating_model. That is
+    # right when the deficit is reasoning on a scope already understood, and wrong
+    # when the deficit is understanding itself — more effort on a model that cannot
+    # see the whole picture buys nothing. Diagnose the deficit, then pick the knob.
+    - diagnose_whether_the_deficit_is_reasoning_or_capability_before_escalating
+    - escalate_effort_before_model_when_scope_is_understood # v19
+    - escalate_model_before_effort_when_the_deficit_is_context_or_capability # v19
+    - one_escalation_level_per_trigger_except_hard_overrides # v13
   complexity_profiles:
     simple:
       lead: default
@@ -869,7 +1170,7 @@ orchestration:
     - verify_worker_provider_before_work
     - verify_worker_model_before_work
     - verify_worker_effort_before_work
-    - verify_dispatch_envelope_is_complete_before_work    # v13
+    - verify_dispatch_envelope_is_complete_before_work # v13
     - require_worker_done_before_advancing_phase
   # v13: a cold worker cannot infer its contract; the envelope is that contract.
   dispatch_envelope:
@@ -900,17 +1201,22 @@ orchestration:
       - evidence_levels
       - open_questions
       - recommended_next_action
+    # v21: optional rather than required — a field every worker must fill even when
+    # it is empty becomes noise, and noise is how a real challenge gets skimmed past.
+    optional_fields:
+      - band_challenge # see complexity_assessment.band_challenge
     status_values: [complete, partial, blocked, escalated]
   cleanup:
     release_worker_after_verified_worker_done: true
     report_unreleased_terminal_handle: true
-    after_accepted_worker_done_either: [reuse_same_terminal_for_next_dispatch, release_terminal]
+    after_accepted_worker_done_either:
+      [reuse_same_terminal_for_next_dispatch, release_terminal]
 
 documentation:
   enabled: true
   required_before_final_success: true
   root: .docs/features
-  folder_pattern: "{YYYY-MM-DD}_{feature-slug}"
+  folder_pattern: '{YYYY-MM-DD}_{feature-slug}'
   folder_naming:
     source: feature_semantics
     use_branch_name_as_default: false
@@ -924,19 +1230,25 @@ documentation:
   files:
     - ba/requirement.md
     - dev/development.md
-    - qc/verification.md          # v13: QC produced findings with nowhere to persist them
-    - decisions.jsonl             # v13: escalations, gates, model selections, substitutions
-    - traceability.csv            # v13, from band M
-  files_by_band:                  # v13: keeps small tasks cheap
+    - qc/verification.md # v13: QC produced findings with nowhere to persist them
+    - decisions.jsonl # v13: escalations, gates, model selections, substitutions
+    - traceability.csv # v13, from band M
+  files_by_band: # v13: keeps small tasks cheap
     XS: [decisions.jsonl]
-    S:  [ba/requirement.md, dev/development.md, qc/verification.md, decisions.jsonl]
-    M:  all
-    L:  all
+    S:
+      [
+        ba/requirement.md,
+        dev/development.md,
+        qc/verification.md,
+        decisions.jsonl,
+      ]
+    M: all
+    L: all
     XL: all
   language: English
   # v13: every recorded-reason obligation in this file needs one place to land.
   decision_log:
-    path: "{root}/{folder}/decisions.jsonl"
+    path: '{root}/{folder}/decisions.jsonl'
     required_events:
       - complexity_score
       - complexity_rescore
@@ -953,8 +1265,8 @@ documentation:
     implemented_requires_qc_worker_done: true
     implemented_requires_no_open_critical_review_issues: true
     implemented_requires_all_p0_pass: true
-    implemented_requires_no_allowlist_violations: true    # v13
-    implemented_requires_traceability_complete_from_band: M   # v13
+    implemented_requires_no_allowlist_violations: true # v13
+    implemented_requires_traceability_complete_from_band: M # v13
 
 primary_session_policy:
   coordinator_only: true
@@ -967,10 +1279,67 @@ primary_session_policy:
   worktree_reuse_allowed: true
   session_reuse_default: false
 
+# v22: generalizes worktree_reuse_allowed past cross_branch_review to every
+# repo-backed dispatch. Without this, Lead had reuse permission but no mandatory
+# inventory step, so a fresh worktree got created by default on every M2+ task even
+# when a clean reusable one already existed.
+worktree_selection_policy:
+  applies_before: [ba_dispatch, dev_dispatch, qc_dispatch]
+  pool_target_size: 3
+  primary_excluded_from_pool: true
+  inventory_required_fields:
+    - worktree_name
+    - absolute_path
+    - branch
+    - tracking_branch
+    - commit_sha
+    - staged_changes
+    - unstaged_changes
+    - untracked_files
+  reuse_first: true
+  create_new_worktree_while_reusable_candidate_exists: forbidden
+  hidden_or_closed_session_does_not_make_pool_empty_if_worktree_still_registered: true
+  pool_empty_procedure:
+    - report_pool_empty_to_user
+    - ask_user_for_new_worktree_name
+    - never_invent_worktree_name
+    - validate_name_not_in_use_and_filesystem_safe
+    - resolve_checkout_strategy_before_creation
+  selection_gate:
+    ask_which_worktree_when_multiple_candidates_exist_and_user_has_not_named_one: true
+    verify_user_named_worktree_before_use: true
+    ask_again_only_if_user_named_worktree_is_dirty_or_unsafe: true
+  dirty_worktree_safety:
+    auto_checkout: forbidden
+    auto_reset: forbidden
+    auto_stash: forbidden
+    auto_clean: forbidden
+    report_dirty_categories_and_affected_file_counts: true
+    ask_user_to_choose_another_or_decide_on_existing_changes: true
+  branch_occupancy_safety:
+    detect_target_branch_already_checked_out_in_another_worktree: true
+    on_conflict: offer_owning_worktree_or_ask_for_different_branch_or_worktree
+  new_worktree_creation_allowed_when:
+    - pool_empty_and_user_supplied_name
+    - user_explicitly_requests_new_worktree
+    - all_reusable_worktrees_dirty_or_unsafe_and_user_approves
+    - task_requires_isolation_incompatible_with_shared_pool
+    - branch_occupancy_conflict_makes_all_candidates_unusable_and_user_approves
+  never_create_new_worktree_merely_because_target_branch_is_new: true
+  new_worktree_path_policy:
+    location: sibling_of_project_root
+    pattern: "{project_parent_dir}/{worktree_name}"
+    example: project at /c/DM/Mine/Sources/second-thoughts, project_parent_dir is /c/DM/Mine/Sources, new worktree named workspace_2 goes at /c/DM/Mine/Sources/workspace_2
+    never_nest_inside_project_root: true
+    rationale: sibling_worktrees_keep_editor_and_search_tooling_scoped_to_one_project_root_at_a_time
+  worker_launch_after_selection:
+    workspace_reuse_does_not_imply_session_reuse: true
+    start_fresh_supervised_worker_bound_to_selected_worktree: true
+
 cleanup_policy:
   accepted_worker_done_result_is_immutable_during_cleanup: true
   track_task_outcome_and_cleanup_outcome_separately: true
-  future_work_after_non_released_outcome_requires_fresh_worker: true   # v14
+  future_work_after_non_released_outcome_requires_fresh_worker: true # v14
   outcomes:
     released:
       status: RELEASED
@@ -1000,8 +1369,16 @@ cleanup_policy:
 retrospective:
   per_task:
     required_from_band: M
-    fields: [band_at_intake, band_final, escalations_used, dispatches_used,
-             change_requests, mis_scored_dimensions, generalizable_probe]
+    fields:
+      [
+        band_at_intake,
+        band_final,
+        escalations_used,
+        dispatches_used,
+        change_requests,
+        mis_scored_dimensions,
+        generalizable_probe,
+      ]
   batch:
     every_n_tasks: 15
     review:
@@ -1010,6 +1387,13 @@ retrospective:
       - where_change_requests_originate
       - whether_qc_independence_held
       - cost_share_by_band
+      # v19: a target to measure against, not a rule to enforce. Most ordinary
+      # engineering work should never reach sol. Persistent drift upward means the
+      # default is wrong or the escalation conditions are too loose.
+      - dev_model_distribution_target:
+          luna: [0.60, 0.70]
+          terra: [0.20, 0.30]
+          sol: [0.05, 0.10]
 
 # ─────────────────────────────────────────────────────────────
 # v14: Dispatch lifecycle — distinct from the report status in return_envelope.
@@ -1075,7 +1459,8 @@ lead_authority_boundary:
 # the order. A reopened Lead session that skips step 2 duplicates a live Run.
 # ─────────────────────────────────────────────────────────────
 coordinator_resume:
-  applies_when: [session_is_new, session_reopened, replacing_a_closed_coordinator]
+  applies_when:
+    [session_is_new, session_reopened, replacing_a_closed_coordinator]
   procedure:
     - confirm_orca_runtime_readiness
     - inspect_existing_runs_before_creating_anything
@@ -1094,26 +1479,27 @@ coordinator_resume:
 # ─────────────────────────────────────────────────────────────
 document_status:
   values:
-    draft:       authored but not agreed; may contain open questions
-    confirmed:   agreed and stable; safe to build or verify against
+    draft: authored but not agreed; may contain open questions
+    confirmed: agreed and stable; safe to build or verify against
     implemented: the described change exists, is verified, and passed the status gate
   transitions:
-    draft_to_confirmed:     requires_no_blocking_open_questions
+    draft_to_confirmed: requires_no_blocking_open_questions
     confirmed_to_implemented: requires_all_of_documentation_status_gate
   ceilings_by_mode:
     research_only: confirmed
-    qc_only:       confirmed
+    qc_only: confirmed
   rule: a_document_may_not_be_marked_implemented_by_the_role_that_authored_the_change
 
 # ─────────────────────────────────────────────────────────────
 # v14: Rework loop — the QC-fail cycle, named and budgeted.
 # ─────────────────────────────────────────────────────────────
 rework_loop:
-  sequence: [qc_reports_defects_to_lead, lead_classifies, remedy, fresh_qc_dispatch]
+  sequence:
+    [qc_reports_defects_to_lead, lead_classifies, remedy, fresh_qc_dispatch]
   lead_classification:
-    technical_fix:          dispatch_dev_with_the_qc_findings
-    requirement_gap:        change_control.classes.scope_addition
-    business_decision:      escalate_to_user_before_dev_changes_behavior
+    technical_fix: dispatch_dev_with_the_qc_findings
+    requirement_gap: change_control.classes.scope_addition
+    business_decision: escalate_to_user_before_dev_changes_behavior
     invalid_or_out_of_scope: record_and_close_the_finding_with_a_reason
   qc_may_fix_the_defect_itself: false
   re_verification_requires_a_new_qc_dispatch: true

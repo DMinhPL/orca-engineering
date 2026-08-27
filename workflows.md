@@ -144,6 +144,51 @@ Lead as a change request rather than becoming a wider diff.
 Document status follows `document_status.values` — draft, confirmed, implemented —
 and a document may not be marked implemented by the role that authored the change.
 
+## 1.9 Worktree pool gate
+
+`worktree_selection_policy`. Before Lead starts any repo-backed BA, Dev, or QC worker
+— not only the `cross_branch_review` case — inspect the registered worktree pool and
+prefer reuse. `primary_session_policy` already grants worktree reuse; this gate is
+the mandatory inventory step that makes reuse the default instead of an option Lead
+has to remember.
+
+1. List registered worktrees with a read-only Git command. Exclude Primary from the
+   candidate pool — it stays on its coordinator branch regardless of what this gate
+   decides.
+2. For every remaining candidate, read `worktree_selection_policy
+   .inventory_required_fields` — name, path, branch, tracking branch, commit, staged,
+   unstaged, untracked. A worktree whose old Orca session is hidden or closed is still
+   a reusable candidate if the worktree itself is still registered.
+3. **Zero reusable candidates:** the pool is empty. Say so, and follow
+   `pool_empty_procedure` — ask for a new worktree name, never invent one, validate
+   it, then resolve the checkout strategy before creating anything.
+4. **One or more reusable candidates, no worktree named by the user:** present the
+   inventory and ask which one to use. Do not create a new worktree while a safe
+   reusable one exists (`create_new_worktree_while_reusable_candidate_exists:
+   forbidden`) — a new branch target is not by itself a reason to create one; check
+   out the target branch in a reused worktree instead when that's safe.
+5. **User already named a worktree:** verify it, don't ask again — unless it turns
+   out dirty or unsafe, in which case fall back to step 3/4's questions.
+6. **Dirty candidate:** never auto-checkout, reset, stash, or clean it
+   (`dirty_worktree_safety`). Report which categories are dirty and how many files,
+   and let the user choose a different worktree or decide what happens to the
+   existing changes.
+7. **Branch occupancy:** before checkout, check whether the target local branch is
+   already checked out in another worktree. If so, do not attempt a duplicate
+   checkout — point the user at the worktree that owns it, or ask for a different
+   branch/worktree strategy.
+8. Create a new worktree only for a reason listed in
+   `new_worktree_creation_allowed_when`, and only after the user supplies the name —
+   never derive or guess it. Place it per `new_worktree_path_policy`: as a sibling of
+   the project root, not nested inside it — a project at `/c/DM/Mine/Sources/
+   second-thoughts` gets its new worktree at `/c/DM/Mine/Sources/{worktree_name}`,
+   never under `second-thoughts/`.
+
+Worktree reuse is never session reuse. Once the worktree is selected and its branch
+state resolved, start a fresh supervised worker bound to it — never resume an old
+ordinary chat session just because that worktree had one before
+(`worker_launch_after_selection`).
+
 ---
 
 # Part 2 — Workflow modes
@@ -222,6 +267,9 @@ Primary stays on A. Create or reuse a separate worktree for B and start QC as a 
 supervised worker there. Never checkout B inside Primary. Start BA only if requirement
 or architecture clarification is materially required; start Dev only if the user asks
 for the findings to be fixed.
+
+This mode is the branch-B-specific case of the general §1.9 worktree pool gate — run
+the inventory-and-reuse procedure there before creating B's worktree.
 
 ---
 

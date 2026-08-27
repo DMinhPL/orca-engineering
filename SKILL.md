@@ -43,6 +43,16 @@ provider/model/effort, stop and report. Never substitute silently.
 | Handling a mid-flight scope change (Lead only) | `skills/orca-change-control/SKILL.md` |
 | Closing a task (Lead only) | `skills/orca-closeout/SKILL.md` |
 
+## Knowledge sources
+
+When `knowledge_sources` declares them available, **GitNexus** (code graph:
+architecture, dependencies, call chains, impacted files) and **Knowns** (project
+memory: decisions, docs, prior implementations) are queried *before* broad repository
+scanning. Availability is detected by Lead once per task and stated in the dispatch
+envelope — never assumed by a worker, never a blocker when missing. A stale GitNexus
+index may not be cited as `confirmed` evidence. QC's access to Knowns is restricted:
+it can carry Dev's reasoning, which is the one context QC must not see.
+
 Read your own role skill and the YAML. You do not need the others — a cold worker
 reading past six roles to find its own is exactly the token cost `optimization`
 exists to avoid.

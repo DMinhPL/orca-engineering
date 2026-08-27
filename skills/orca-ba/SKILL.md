@@ -38,6 +38,25 @@ in `research_only` mode it is M0 by definition.
 8. A proposed file allowlist
 9. Evidence level on every material claim
 
+## 0. Knowledge sources before repository scanning
+
+`knowledge_sources`. Lead states in the envelope which are available. Both are
+optional — if neither is, read the repository directly and say so in your report.
+
+- **GitNexus** (code graph) — architecture, dependencies, call chains, impacted
+  files. Query it *before* scanning broadly: `impact` gives a blast radius with
+  confidence at depth 1/2/3, `trace` gives the call path between two symbols in one
+  call, `route_map` and `api_impact` give the contract surface. **Check freshness.** A
+  stale index is a confidently wrong answer — report `commits_behind` and tag the
+  claim `hypothesis`, never `confirmed`.
+- **Knowns** (project memory) — prior decisions, architecture notes, task history,
+  earlier implementations. Authoritative for *why* something is the way it is.
+
+Neither is authoritative for the requirement. Code tells you what exists, memory tells
+you what was decided; **only the user and the requirement document tell you what is
+wanted.** On conflict the precedence is `knowledge_sources.precedence.order`, and a
+memory that disagrees with the code is a finding — report it, do not quietly pick one.
+
 ## 1. Separate the stated request from the need
 
 Record both. Requests that arrive as solutions ("add a Redis cache") are the most
@@ -116,6 +135,19 @@ Blast radius, which feeds the allowlist:
 - Partial-rollout behaviour — old and new code running simultaneously
 
 That last one is the most commonly missed and the most expensive.
+
+If your blast-radius findings materially contradict the band you were dispatched
+under, raise `band_challenge` in your return envelope — observed band, dimensions
+moved, evidence, evidence level. You produce d3 and d1 properly for the first time in
+the task, so a contradiction here is expected rather than exceptional, and Lead needs
+it before granting the allowlist rather than after Dev overruns it. It is evidence for
+Lead to arbitrate, not a rescore you perform.
+
+When GitNexus is available this list is largely computable rather than recalled:
+`impact` covers callers and callees, `route_map` / `shape_check` cover contract drift,
+`cypher` over `ACCESSES` finds other readers of the same data. Two items it will
+**not** give you — constructors reached by reflection or DI, and partial-rollout
+behaviour — remain yours. Absence of a graph finding is not proof of absence.
 
 ## 7. Propose the file allowlist
 

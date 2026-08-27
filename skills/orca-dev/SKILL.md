@@ -33,6 +33,42 @@ if:
 Then read the **exclusions** in the requirement document. Knowing what you are not
 building prevents most drift.
 
+### If the band looks wrong, say so now
+
+`complexity_assessment.band_challenge`. Lead scored this task from the request text and
+a shallow look at the repo, before anyone had read the code. **You are the first person
+in the pod to actually read it.** If your first read says the band is materially wrong,
+raise `band_challenge` in your return envelope: observed band, which dimensions moved,
+your evidence, and its evidence level.
+
+Do this on the **first read, before substantive work** — not after you have blown
+through the allowlist. The other rescore triggers all require the mis-scoring to have
+already cost something; this one exists so it does not have to.
+
+Two hard limits. It is **evidence for Lead, not a decision of yours** — you may not
+adjust your own tier, effort, or model on the strength of it, and you may not proceed
+as though the rescore were granted. And if your challenge would put the band at L or XL
+or match a hard override, gate G1 should have fired before you started: **stop and wait
+for Lead.** Writing on would put changes past a gate that never ran. In every other
+case, continue under the tier you were granted and note the challenge in your report.
+
+### Knowledge sources
+
+`knowledge_sources`. Lead names the available ones in the envelope; when neither is
+available, read the repository directly.
+
+- **GitNexus** — before scanning broadly, ask the graph. `trace` gives a call path in
+  one query instead of six file reads; `context` gives a symbol's callers and the
+  processes it participates in; `impact` tells you whether a change reaches past your
+  allowlist — which is a change request to Lead, not a wider diff. Verify freshness
+  before relying on it.
+- **Knowns** — check for prior decisions and earlier implementations of the same
+  pattern before inventing one. Precedent in the repo is what `d6 novelty` was scoring.
+
+A query is not an approval. Neither source widens your allowlist or alters the
+acceptance criteria — if the graph shows the right fix lives outside your boundary,
+that is `stop_and_raise_change_request`, unchanged.
+
 ## The allowlist is the boundary
 
 `modification_policy.file_allowlist.edit_outside_allowlist: forbidden`. Every file
@@ -90,14 +126,44 @@ months.
 ```
 failure 1  → read the actual error, not the expected one. Retry once.
 failure 2  → STOP and report to Lead with a recorded reason. Lead decides whether to
-             escalate you along the escalation_chain (complex → hard → very_hard).
+             escalate you along the escalation_chain.
 ```
 
-You do not escalate yourself. Escalation is a Lead decision, and at `hard` and
-`very_hard` Lead chooses between the preferred and alternative model and records why.
-Your job is to report the observed condition accurately — `difficult_root_cause`,
-`concurrency_or_race_condition`, `architecture_heavy_implementation` — so the choice
-is informed.
+You do not escalate yourself. Escalation is a Lead decision, and it is
+**evidence-based** — `escalation_policy.escalate_only_when_execution_produces_evidence`.
+Sounding difficult is not a trigger; producing one of the conditions in
+`escalation_policy.escalate_when` is.
+
+### Name the deficit, not just the failure
+
+The chain has five rungs, and the first two are **siblings rather than steps**:
+
+| You observed | Rung | Because |
+|---|---|---|
+| Scope is clear, files known, you just need to think harder | `scoped_deeper_reasoning` | more effort, same model |
+| You do not understand the code well enough to be confident | `broader_capability` | more capability, *lower* effort |
+
+That distinction is the whole point of the split. More reasoning effort on a model
+that cannot see the whole picture buys nothing —
+`optimization.rules.escalate_model_before_effort_when_the_deficit_is_context_or_capability`.
+So report **which kind of stuck you are**: `required_context_exceeds_current_scope` and
+`unfamiliar_codepath` route somewhere completely different from
+`implementation_needs_deeper_reasoning`.
+
+Above those sit `complex`, `hard` and `very_hard`. Note that `hard` can be entered
+directly, skipping the lower rungs, when `d3 >= 2` or a hard override matched — a
+dangerous change does not work its way up from cheap.
+
+### Hand your findings forward
+
+`escalation_policy.do_not_restart_discovery_after_escalation`. An escalated worker
+boots cold, so whatever you learned dies with your session unless you write it down.
+Your report is what carries it: affected files, relevant symbols, contracts touched,
+what you ruled out and why. **Findings, not transcripts.**
+
+The escalation exists to add capability to your discovery, not to repeat it. A Terra
+worker re-reading the same twelve files Luna already read is the exact waste the chain
+was restructured to prevent.
 
 Most second failures are misunderstandings, not bugs. Say so if that is what you see.
 

@@ -13,6 +13,7 @@ Checks:
   C4  dotted YAML paths referenced in prose that do not resolve
   C5  enumerated vocabulary used in prose but never defined in the YAML
   C6  YAML internal integrity (band coverage, mode/type mapping, gate references)
+  C7  config_version has a matching CHANGELOG.md entry
 
 Usage:
     python scripts/lint_config.py                 # lint the whole skillset
@@ -34,8 +35,11 @@ YAML_REL = "references/agents-models.yaml"
 
 # Files allowed to name a model: the YAML itself, the review (which discusses the
 # config), and envelope examples that must show a concrete dispatch to be useful.
-MODEL_EXEMPT = {YAML_REL, "REVIEW.md", "REVIEW-workflows.md", "references/handoff-protocol.md"}
-FLOW_EXEMPT = {YAML_REL, "REVIEW.md", "REVIEW-workflows.md", "workflows.md"}
+CHANGELOG_REL = "CHANGELOG.md"
+
+MODEL_EXEMPT = {YAML_REL, CHANGELOG_REL, "REVIEW.md", "REVIEW-workflows.md",
+                "references/handoff-protocol.md"}
+FLOW_EXEMPT = {YAML_REL, CHANGELOG_REL, "REVIEW.md", "REVIEW-workflows.md", "workflows.md"}
 
 EFFORTS = ["low", "medium", "high", "xhigh"]
 
@@ -201,8 +205,30 @@ class Lint:
                              f"mode '{mode}': {flow[i]} -> {flow[i+1]} is a specialist-to-specialist "
                              f"edge, forbidden by communication.deny")
 
+    # C7 — the changelog tracks the config
+    def c7(self):
+        cur = self.y.get("config_version")
+        path = self.root / CHANGELOG_REL
+        if not path.exists():
+            self.add("ERROR", "C7", CHANGELOG_REL,
+                     f"missing; config_version {cur} has nowhere to be recorded")
+            return
+
+        text = path.read_text(encoding="utf-8")
+        versions = {int(m) for m in re.findall(r"^##\s*v(\d+)\b", text, re.M)}
+        if cur not in versions:
+            self.add("ERROR", "C7", CHANGELOG_REL,
+                     f"no '## v{cur}' entry for config_version {cur}; "
+                     f"bumping the version without recording the change is how the "
+                     f"history stops being trustworthy")
+        # A version documented but never shipped is the same drift in reverse.
+        ahead = {v for v in versions if isinstance(cur, int) and v > cur}
+        if ahead:
+            self.add("WARN", "C7", CHANGELOG_REL,
+                     f"entries ahead of config_version {cur}: {sorted(ahead)}")
+
     def run(self):
-        for c in (self.c1, self.c2, self.c3, self.c4, self.c5, self.c6):
+        for c in (self.c1, self.c2, self.c3, self.c4, self.c5, self.c6, self.c7):
             c()
         return self.findings
 
