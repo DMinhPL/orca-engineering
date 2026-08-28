@@ -50,7 +50,7 @@ and PMI's AI standard to small, high-frequency software tasks — see
 skills/
 ├── orca-lead/               dispatch procedure, arbitration, gates, escalation
 ├── orca-ba/                 requirements, acceptance criteria, risk, blast radius
-├── orca-dev/                implementation bounded by modification tier and allowlist
+├── orca-dev/                implementation bounded by modification tier, allowlist, and design heuristics (DRY, KISS, YAGNI, ...)
 ├── orca-qc/                 delta-only independent verification and review
 ├── orca-change-control/     Lead-owned — mid-flight scope changes
 └── orca-closeout/           Lead-owned — status gate and retrospective
@@ -82,6 +82,7 @@ the YAML wins and the skill file is the bug —
 | `scripts/retro_report.py` | Aggregates `decisions.jsonl` across tasks — escalation rate, allowlist amendments, requirement-gap change requests, upward re-scores |
 | `CHANGELOG.md` | Version history for `agents-models.yaml` |
 | `REVIEW.md` / `REVIEW-workflows.md` | Design review findings behind the v13 and v14 changes |
+| `examples/extra-skills/` | Worked example of a project overlay (see below) |
 
 ## Workflow modes
 
@@ -96,6 +97,42 @@ detail on when each applies and which gates it emphasises:
 - **qc_only** — verification of existing changes, no new implementation (tier M0)
 - **cross_branch_review** — reviewing another branch while Primary stays on its own
 
+## Project overlay (optional)
+
+This package is shared across projects, so its defaults are generic. A single
+project can tailor a role — a domain convention, an extra guardrail, which
+engineering principle to weigh heaviest — without editing the package itself, by
+dropping markdown files into its own repository:
+
+```
+your-project/
+  extra-skills/
+    lead/
+    ba/
+    dev/
+      01-money-conventions.md
+      02-ledger-guardrails.md
+    qc/
+```
+
+Each file under `extra-skills/{role}/` is an independent additional skill for
+that role, read after the role's default `SKILL.md`, in filename order. An empty
+or absent folder for a role is the common case and is silently ignored — nothing
+to set up if you don't need it. Lead detects what exists once per task and hands
+the file list to the dispatched worker, the same way it hands over
+`knowledge_sources`.
+
+An overlay file may only add or tighten — name conventions, add checks, narrow an
+already-granted allowlist, point at project docs. It may never loosen a
+prohibition, change a modification tier or gate, or widen an allowlist: where an
+overlay disagrees with the role's default skill or `agents-models.yaml`, the
+default wins and the overlay is the bug. Two overlay files disagreeing with each
+other is reported to Lead, never resolved by file order.
+
+See [`references/agents-models.yaml`](references/agents-models.yaml) →
+`project_overlay` for the full contract, and
+[`examples/extra-skills/dev/`](examples/extra-skills/dev/) for a worked example.
+
 ## Getting started
 
 1. Read [`SKILL.md`](SKILL.md) to understand the router and the four commitments.
@@ -109,6 +146,6 @@ detail on when each applies and which gates it emphasises:
 
 ## Status
 
-Config `schema_version: 3`, `config_version: 20` — see [`CHANGELOG.md`](CHANGELOG.md)
+Config `schema_version: 3`, `config_version: 25` — see [`CHANGELOG.md`](CHANGELOG.md)
 for the version history, and [`REVIEW.md`](REVIEW.md) /
 [`REVIEW-workflows.md`](REVIEW-workflows.md) for the design review findings behind it.
