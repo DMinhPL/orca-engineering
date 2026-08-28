@@ -57,6 +57,25 @@ Read your own role skill and the YAML. You do not need the others — a cold wor
 reading past six roles to find its own is exactly the token cost `optimization`
 exists to avoid.
 
+## Project overlay (optional)
+
+A project can tailor a role's defaults — house conventions, an extra guardrail,
+which engineering principle it weighs heaviest — without touching this shared
+package, by dropping one or more markdown files into
+`{project_root}/extra-skills/{role}/` (`lead`, `ba`, `dev`, `qc`). Each file is its
+own additional skill — `extra-skills/dev/money-conventions.md`,
+`extra-skills/dev/rollback-guardrail.md`, however many a project needs — added or
+removed independently of the others. Lead detects the directory's contents once
+per task, same rhythm as `knowledge_sources`, and states the file list in the
+dispatch envelope. Most projects have no such directory, or an empty one, which is
+the expected default and is silently ignored, not a gap to fill.
+
+An overlay file only adds or tightens — it can never loosen a prohibition, change
+a tier or gate, or widen an allowlist. Where it disagrees with a role skill or the
+YAML, they win and the overlay file is the bug; where two overlay files disagree
+with each other, that is reported to Lead rather than resolved by file order. See
+`project_overlay` in `references/agents-models.yaml` for the full contract.
+
 ## References
 
 - `workflows.md` — the gate set, the mode catalogue, and the cross-cutting operations

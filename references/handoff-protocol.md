@@ -54,6 +54,12 @@ optimisation.
     "knowns":   {"available": false}
   },
 
+  "project_overlay": {
+    "role": "dev",
+    "available": true,
+    "files": ["extra-skills/dev/money-conventions.md", "extra-skills/dev/rollback-guardrail.md"]
+  },
+
   "escalate_to_lead_when": [
     "a needed change falls outside the allowlist",
     "the same material failure occurs twice",
@@ -84,6 +90,14 @@ optimisation.
   cited as `confirmed` evidence, and the worker cannot know that on its own. Omitting
   the field makes three cold workers each re-probe, which is the cost the sources were
   added to avoid. For QC, remember `by_role.qc` restricts Knowns but not GitNexus.
+- **`project_overlay`** — same detect-once rhythm as `knowledge_sources`, for the
+  optional directory `extra-skills/{role}/` in the target project: any `.md` file
+  in it is an independent additional skill. Most tasks have none — an empty or
+  absent directory, `available: false` (or the field omitted), is normal, not a
+  gap. When files are present, the worker reads its own role skill first, then
+  every listed file in order, each as an added layer — see `project_overlay` in
+  the YAML for what an overlay file may and may not do, and how a conflict
+  between two overlay files is handled.
 
 ### Rejecting an incomplete envelope
 

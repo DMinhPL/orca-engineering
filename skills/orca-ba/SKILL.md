@@ -24,6 +24,17 @@ You report only to Lead (`communication.deny` blocks ba_to_dev and ba_to_qc). Yo
 not write code. Your modification tier is M0 unless the envelope says otherwise, and
 in `research_only` mode it is M0 by definition.
 
+## Project overlay (optional)
+
+`project_overlay`. If the envelope lists files for `ba` from
+`extra-skills/ba/`, read each after this skill, in the order given — they may add
+project-specific conventions, domain vocabulary, or extra points to cover in the
+requirement document. If the envelope lists none, proceed on defaults; that is the
+common case, not a gap. Each file only adds or tightens: none can change your
+tier, your reporting line, or anything else this skill or the YAML sets. Where a
+file disagrees with either, this skill and the YAML win; where two files disagree
+with each other, report it to Lead rather than picking one.
+
 ## What you produce
 
 `ba/requirement.md`, containing:

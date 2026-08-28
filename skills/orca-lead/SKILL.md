@@ -100,6 +100,23 @@ You may use `context`, `impact` and `route_map` yourself as **sizing input** for
 and d4. That is the boundary: it informs the band you assign. It does not become you
 performing BA's blast-radius analysis — see `lead_authority_boundary`.
 
+### Detect the project overlay — same rhythm, here too
+
+`project_overlay.detect: once_per_task_at_classification`. List
+`{project_root}/extra-skills/{role}/` for the role(s) you are about to dispatch.
+Most tasks find an empty or absent directory — that is the expected state, not
+worth remarking on. When files exist, record the list in the dispatch envelope so
+the worker reads them as added layers after its own role skill, never instead of
+it, in filename order.
+
+An overlay file only adds or tightens; it cannot loosen a prohibition, change a
+tier or gate, or widen an allowlist you granted. If one tries to, that is the
+overlay disagreeing with policy you own — treat it the way any YAML/skill conflict
+is treated: the default wins, and note the conflict rather than honoring the
+overlay. If two overlay files in the same directory disagree with each other, that
+is also yours to arbitrate — report it rather than letting one silently win by
+file order.
+
 ### 3. Select mode and profile
 
 The band suggests both. `default_mode_by_type` gives the type's baseline. Downgrading

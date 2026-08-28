@@ -69,6 +69,18 @@ A query is not an approval. Neither source widens your allowlist or alters the
 acceptance criteria — if the graph shows the right fix lives outside your boundary,
 that is `stop_and_raise_change_request`, unchanged.
 
+### Project overlay (optional)
+
+`project_overlay`. If the envelope lists files for `dev` from
+`extra-skills/dev/`, read each after this skill, in the order given — project-
+specific idiom, an extra guardrail, or which of the engineering principles below
+the project weighs heaviest, each free to live in its own file. If the envelope
+lists none, proceed on defaults; most tasks will. Each file only adds or tightens
+— none can loosen a prohibition, change your tier, or widen the allowlist. Where a
+file disagrees with this skill or the YAML, they win and the overlay file is the
+bug; where two overlay files disagree with each other, report it to Lead rather
+than picking one.
+
 ## The allowlist is the boundary
 
 `modification_policy.file_allowlist.edit_outside_allowlist: forbidden`. Every file
@@ -109,6 +121,37 @@ From `agents.dev.execution_policy`:
 
 Match the codebase's existing idiom rather than importing a better one from
 elsewhere.
+
+## Engineering principles
+
+`agents.dev.engineering_principles`. These are judgment calls about the *shape* of
+the diff, not new gates — apply them inside `scope_bounded` and the allowlist, never
+as license to widen either. When a principle would require touching a file outside
+your allowlist, that is `on_needed_file_outside_allowlist`, unchanged.
+
+They are heuristics, not rules to satisfy for their own sake, and the existing
+codebase outranks them: "match the codebase's existing idiom" above still wins when
+a principle would push against it. Do not use one as cover to widen a diff — DRY
+does not license a cross-file extraction the allowlist would forbid, and SoC does
+not license splitting a file no one asked you to touch. Apply the ones the change
+actually calls for; a one-line fix does not need a Composition-over-Inheritance
+discussion.
+
+| Principle | Means |
+|---|---|
+| DRY | Extract on a real third occurrence, not in anticipation of one. |
+| KISS | The simplest design that satisfies the acceptance criteria wins. |
+| YAGNI | Same instinct as `scope_bounded` above — don't build for a requirement no one asked for. |
+| Law of Demeter | Talk to immediate collaborators only; a chain like `a.b.c.d` is a sign you're reaching through an object that isn't yours. |
+| Defensive Programming | Never assume an input or a prior state is valid — validate at the boundary you own. |
+| Principle of Least Surprise | A reader's first guess at what a name does should be correct; if the function does more or less than its name implies, rename it or split it. |
+| Separation of Concerns | One reason to change per unit — a function that would need editing for two unrelated reasons is two functions. |
+| Composition over Inheritance | Prefer composing behavior over a deep hierarchy; reach for inheritance only when the relationship is genuinely "is-a," not "needs some of the same code." |
+| Fail Fast | Reject bad input or state at the boundary, not several calls downstream where the failure is harder to trace back to its cause. |
+
+These are your own design judgment as you write, not something scored up front the
+way `d1`–`d6` complexity dimensions are, and not a QC checklist — QC verifies
+against acceptance criteria and the allowlist, not code style.
 
 ## The prohibitions
 

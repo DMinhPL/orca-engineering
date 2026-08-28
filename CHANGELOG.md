@@ -14,6 +14,86 @@ Legend: `+` added · `~` changed · `-` removed
 
 ---
 
+## v25 — project overlay is a directory of files, not one file
+
+v24 shipped as a single `.orca/{role}.md` file. In practice a project has several
+unrelated things to add to a role — one domain convention, one guardrail, one
+style note — and forcing them into one file means every unrelated addition or
+removal touches the same file, which is the merge-conflict and review-noise
+problem the overlay was supposed to avoid.
+
+- `~ project_overlay.directory_pattern` — `{project_root}/.orca/{role}.md` (a
+  file) → `{project_root}/extra-skills/{role}/*.md` (a directory). Any number of
+  markdown files, each independent, each an additional skill on its own topic.
+  An empty or absent directory is still silently ignored — the common case is
+  unchanged, only the shape of the uncommon case is.
+- `+ project_overlay.precedence.on_conflict_between_overlay_files` — two overlay
+  files disagreeing is now a real possibility once there can be more than one;
+  it is reported to Lead to arbitrate, never resolved by filename order.
+- `~ references/handoff-protocol.md`, `~ skills/orca-{lead,ba,dev,qc}/SKILL.md`,
+  `~ SKILL.md` — updated for the directory/file-list shape.
+- `~ examples/project-overlay/` — the single-file example split into
+  `examples/extra-skills/dev/` with two files, demonstrating the intended use:
+  one file per concern.
+
+**Considered and rejected:** keeping the single file and telling projects to use
+headings for separate concerns — that still forces one shared file for
+unrelated additions, which is exactly what a directory of independent files
+avoids at no extra cost.
+
+---
+
+## v24 — optional per-project overlay for each role
+
+Every role's defaults live in this shared package, used across projects. There was
+no way for one project to tailor a role — house conventions, an extra guardrail,
+which engineering principle it cares about most — without editing the package
+itself, which would leak into every other project using it.
+
+- `+ project_overlay` — an optional, per-project markdown file at
+  `{project_root}/.orca/{role}.md` for `lead`, `ba`, `dev`, `qc`. Lead detects
+  presence once per task at classification (same rhythm as `knowledge_sources`)
+  and states it in the dispatch envelope; a missing file is the expected default
+  state, not a fallback worth logging. Additive/tightening only — it can name
+  conventions, add checks, narrow an allowlist further, or point at project
+  references, but it cannot loosen a prohibition, change a tier or gate, widen an
+  allowlist, or override any other value in this file. On conflict with the
+  default skill or this file, the default wins and the overlay is the bug — the
+  same shape as the existing YAML-wins rule.
+- `~ references/handoff-protocol.md` — dispatch envelope example gets an optional
+  `project_overlay` field alongside `knowledge_sources`.
+- `~ skills/orca-{lead,ba,dev,qc}/SKILL.md` — each gets a short "Project overlay"
+  note: check for the file, read it after the default skill, apply it as an
+  additional layer, never a substitute.
+
+**Considered and rejected:** storing the overlay inside this package (e.g. a
+`projects/{name}/` subtree) — that would require editing the shared package per
+project and defeats the purpose; the whole point is that it lives with the
+project it tailors and this package never needs to change for it to exist.
+
+---
+
+## v23 — engineering design principles for Dev
+
+`execution_policy` said *how much* to build (scope-bounded, no broad scan) but never
+said anything about the *shape* of the code once written — that was left implicit,
+so it varied by whichever model happened to be dispatched.
+
+- `+ agents.dev.engineering_principles` — DRY, KISS, YAGNI, Law of Demeter, Defensive
+  Programming, Principle of Least Surprise, Separation of Concerns, Composition over
+  Inheritance, Fail Fast. Heuristics, not gates: applied with judgment, deferring to
+  the codebase's existing idiom, and never license to widen the allowlist or
+  `scope_bounded`.
+- `~ skills/orca-dev/SKILL.md` — new "Engineering principles" section under
+  Execution policy.
+
+**Considered and rejected:** a separate scored checklist (like `d1`–`d6` complexity
+dimensions) for principle adherence, and a new QC checklist item for it — these are
+Dev's own design judgment while writing, not measurable signals Lead can gate on or
+QC can verify against.
+
+---
+
 ## v22 — worktree pool reuse is mandatory, not just permitted
 
 `primary_session_policy.worktree_reuse_allowed` already existed, but nothing forced

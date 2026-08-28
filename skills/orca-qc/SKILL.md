@@ -35,6 +35,18 @@ So: **open the acceptance criteria first, before the diff.** If you find yoursel
 adjusting a test because "the implementation does it differently" — that adjustment
 is the finding you were dispatched to produce.
 
+## Project overlay (optional)
+
+`project_overlay`. If the envelope lists files for `qc` from
+`extra-skills/qc/`, read each after this skill, in the order given —
+project-specific conventions or extra checks worth verifying, for instance. These
+are project files, not task context, so reading them does not touch `context_mode:
+delta_only` or the forbidden-context list. None can loosen `qc_policy`, change
+your tier, or add authority you don't otherwise have (still no fixing code, still
+no contacting BA or Dev). If the envelope lists none, proceed on defaults — the
+common case. If two overlay files disagree with each other, report it to Lead
+rather than picking one.
+
 ## Your allowed context
 
 `git_diff` · relevant BA requirement sections · relevant Dev development sections ·

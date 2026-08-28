@@ -1,5 +1,5 @@
 schema_version: 3
-config_version: 22
+config_version: 25
 
 # Central provider/model/effort configuration for the four-agent Orca workflow.
 # Per-task user overrides take precedence over these defaults.
@@ -149,6 +149,17 @@ agents:
       on_needed_file_outside_allowlist: stop_and_raise_change_request # v13
       mix_refactor_and_behavior_in_one_commit: forbidden # v13
       disable_or_weaken_test_to_pass: forbidden # v13
+
+    engineering_principles:
+      dry: dont_repeat_yourself # extract only on a real third occurrence, not in anticipation
+      kiss: keep_it_simple # the simplest design that satisfies the acceptance criteria wins
+      yagni: dont_build_for_hypothetical_future_requirements # ties to scope_bounded above
+      law_of_demeter: talk_only_to_immediate_collaborators # avoid reaching through a.b.c.d chains
+      defensive_programming: never_assume_input_or_state_is_valid # validate at the boundary you own
+      principle_of_least_surprise: name_must_match_behavior # a reader's first guess about what it does should be correct
+      separation_of_concerns: one_reason_to_change_per_unit
+      composition_over_inheritance: prefer_composing_behavior_over_deep_hierarchies
+      fail_fast: reject_bad_input_or_state_at_the_boundary_not_deep_inside # surface errors at the earliest point, not several calls downstream
     # v19: Escalation carries evidence forward. fresh_supervised_worker_for_every
     # _specialist_phase means an escalated Dev boots cold, so without this the
     # escalation restarts discovery from zero — the single most expensive waste in
@@ -1093,6 +1104,52 @@ knowledge_sources:
       - speculative_querying_without_a_stated_question
       - re_querying_what_a_prior_phase_already_reported
 
+project_overlay:
+  enabled: true
+  optional: true # absence is the default, expected state — not a blocker, not reported
+  purpose: let one project tailor a role's defaults (domain conventions, extra
+    guardrails, house style, project-specific priority principles) without editing
+    this shared package, which is used across projects
+  lives_in: the_target_project_repository # never inside this skill package
+  # v25: a directory of independent files, not one file. Each file in the
+  # directory is its own additional skill — one for a domain convention, one for
+  # a guardrail, one for a style note — added or removed without editing the
+  # others. An empty or absent directory is silently ignored, same as a missing
+  # single file was in v24.
+  directory_pattern: '{project_root}/extra-skills/{role}/'
+  file_glob: '*.md'
+  roles: [lead, ba, dev, qc]
+  detect: once_per_task_at_classification
+  detected_by: lead
+  on_directory_missing_or_empty: use_role_defaults_only # silent — the common case, not logged as a gap
+  read_order: role_skill_first_then_every_file_in_the_directory # each file layers on top of the default and on top of each other, in filename order
+  precedence:
+    # Same shape as the YAML-wins rule at the top of every role file: where any
+    # overlay file and the default disagree, the default wins and the overlay
+    # file is the bug. This also orders overlay files against each other: a
+    # later file may not silently reverse an earlier one — if two files
+    # disagree, that is a conflict to report, not a last-file-wins resolution.
+    additive_or_tightening_only: true
+    may:
+      - name project-specific conventions, idioms, and domain vocabulary
+      - add extra checks, or a narrower allowlist than the granted tier already implies
+      - state which engineering_principles the project weighs heaviest
+      - point at project-specific references (style guides, ADRs, domain glossaries)
+    may_not:
+      - loosen a prohibition
+      - change a modification_tier, gate, or escalation rule
+      - widen a file_allowlist granted by lead
+      - override any agents-models.yaml value
+    on_conflict_with_default_skill_or_yaml: default_wins_overlay_is_the_bug
+    on_conflict_between_overlay_files: report_to_lead_rather_than_silently_picking_one
+  propagation:
+    stated_in: dispatch_envelope.project_overlay # optional field: {role}, available, files: [paths]
+    reason:
+      a cold worker cannot discover its own overlay's relevance to the task
+      the way it discovers knowledge_sources — lead states the file list and
+      availability once, same as knowledge_sources, so four workers do not each
+      list the directory for the same answer
+
 optimization:
   objective: minimize_token_usage_without_sacrificing_required_quality
   rules:
@@ -1328,7 +1385,7 @@ worktree_selection_policy:
   never_create_new_worktree_merely_because_target_branch_is_new: true
   new_worktree_path_policy:
     location: sibling_of_project_root
-    pattern: "{project_parent_dir}/{worktree_name}"
+    pattern: '{project_parent_dir}/{worktree_name}'
     example: project at /c/DM/Mine/Sources/second-thoughts, project_parent_dir is /c/DM/Mine/Sources, new worktree named workspace_2 goes at /c/DM/Mine/Sources/workspace_2
     never_nest_inside_project_root: true
     rationale: sibling_worktrees_keep_editor_and_search_tooling_scoped_to_one_project_root_at_a_time
