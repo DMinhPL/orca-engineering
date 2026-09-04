@@ -151,13 +151,29 @@ maps it from the type you assigned at step 1, so the branch cannot disagree with
 classification. Override it only with a recorded reason. Include the ticket suffix only
 when an id actually appears in the request or requirement — never invent one. Put the
 branch name in the dispatch envelope; a worker that has to guess it will guess wrong.
+You decide the name; **Dev creates the branch**, at the start of its dispatch — you
+never run `git checkout -b` yourself.
 
 ### 5. Gates
 
-`human_gates` enumerates the six. A gate is blocking for the writes it governs —
+`human_gates` enumerates the seven. A gate is blocking for the writes it governs —
 non-dependent analysis may continue, the governed writes may not. Use the five-part
 request format: recommendation, reason, material risk, reversal path, one open
-question. Long gate requests get skimmed, and a skimmed gate is not a gate.
+question.
+
+`G7_commit_push_approval` is unconditional and applies even on the task's own work
+branch: no `git commit` or `git push` runs without the user explicitly accepting
+that specific commit or push. Applying an M2+ edit to the working tree is not the
+same authorization as committing it. **On rejection, the edits stay in the
+working tree, uncommitted, local only** — never discarded, reset, or stashed away
+because the commit was declined.
+
+**You request; you never execute.** You raise the gate and relay the user's
+acceptance — the same as every other human gate — but you do not run `git
+commit`, `git push`, or `git checkout -b` yourself. **Dev** runs the accepted
+commit/push, and **Dev** creates the work branch at the start of the M2+
+dispatch, using the name you decided at classification and put in the envelope.
+You name the branch; Dev creates it. Long gate requests get skimmed, and a skimmed gate is not a gate.
 
 ### 6. Dispatch
 

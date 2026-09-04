@@ -64,6 +64,22 @@ If a worker crashes, times out, or never returns `worker_done`: re-dispatch the 
 role when reasonable, otherwise report the blocker. Lead does not fill the gap by
 doing that role's work.
 
+### 1.3a Verified launch receipt
+
+Immediately after `worker-start` succeeds and verification passes, Lead records a
+compact receipt before entering the wait loop. This is an observability checkpoint,
+not an extra approval step:
+
+```text
+<ROLE> worker started
+Run: <run_id>  Task: <task_id>  Dispatch: <dispatch_id>
+Worker: <provider> <model> / <effort>  exactWorker: <true|false>
+Workspace: <logical_workspace>  Branch: <branch>
+```
+
+Print it only from verified orchestration state. For retries or escalations, issue a
+new receipt with the new Dispatch ID; never reuse an earlier receipt.
+
 ## 1.4 Mandatory coordinator wait loop
 
 `dispatch_lifecycle.wait_loop`. After dispatching any supervised worker, keep the
@@ -138,6 +154,20 @@ assumed by the worker. Default tier is M1 — propose, do not apply. From M2 the
 envelope carries a file allowlist; editing outside it is forbidden and routes back to
 Lead as a change request rather than becoming a wider diff.
 
+## 1.7b Commit and push approval gate
+
+`modification_policy.commit_and_push_authorization`, gate `G7_commit_push_approval`.
+No `git commit` or `git push` runs on any branch — including the task's own work
+branch — without the user explicitly accepting that specific commit or push.
+Applying edits under an M2+ tier authorizes writing to the working tree; it does
+not authorize committing or pushing them. On rejection, the edits stay in the
+working tree, uncommitted, local only — never discarded.
+
+Lead *requests* the acceptance; **Dev executes** the accepted `git commit` /
+`git push` — Lead never runs a git write command itself. The same split applies
+to branch creation: Lead names the work branch at classification, Dev creates it
+at the start of the M2+ dispatch.
+
 ## 1.8 Documentation gate
 
 `documentation`. Required artifacts exist and are current before final success.
@@ -184,10 +214,47 @@ has to remember.
    second-thoughts` gets its new worktree at `/c/DM/Mine/Sources/{worktree_name}`,
    never under `second-thoughts/`.
 
+**Sibling placement splits by who creates the worktree.** When Lead itself issues
+the creation, sibling placement is a hard requirement: verify the path before
+creating and re-verify it after — a nested result is a blocker, stop and report it.
+When Orca's own tooling provisions the worktree as part of its normal
+`worker-start` flow, nesting it under Primary is expected platform behavior, not a
+blocker — Lead does not stop or ask the user to intervene. It must still never
+*claim* the result is a sibling without checking the real path, and every such
+case gets one line in the workspace mapping report noting the true layout, e.g.
+"workspace_2: physically nested under Primary; Orca-managed." Lead never
+relocates or recreates an Orca-provisioned worktree on its own to force it sibling.
+
 Worktree reuse is never session reuse. Once the worktree is selected and its branch
 state resolved, start a fresh supervised worker bound to it — never resume an old
 ordinary chat session just because that worktree had one before
 (`worker_launch_after_selection`).
+
+**Single-worker invariant.** At most one active worker per Task + role/stage
+(`single_worker_invariant`). Before every `worker-start`, check for an existing
+active worker on the same Task+role/stage; if one exists, continue supervising it
+instead of starting another. A desired display name is metadata on the first
+launch — it must never by itself justify a second `worker-start`, and a settled or
+retained terminal is not a reusable active worker. A second worker is legitimate
+only for an explicit retry, rework, escalation, or user-approved parallel attempt;
+two active Dispatches for the same Task+role/stage outside that list is a
+duplicate-worker anomaly to report, not to resolve silently.
+
+**Workspace identity stays separate from branch identity** (`identity_policy`).
+The user-selected worktree name is the display identity — prefer
+`{worktree_name} · {ROLE}` (e.g. `workspace_2 · DEV`) in worker/session display
+names wherever Orca supports one. Branch and tracking-branch stay separate
+metadata lines in Lead's reports, never the primary display identity, and a later
+branch change inside that worktree must never silently rename its display
+identity. Before `worker-start`, report the mapping concisely:
+
+```text
+Selected workspace: workspace_2
+Branch: release/feature-game-section-102924
+Tracking: origin/release/feature-game-section-102924
+Worker: DEV
+Display name: workspace_2 · DEV
+```
 
 ---
 

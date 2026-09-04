@@ -1,5 +1,5 @@
 ---
-name: orca-cadence
+name: orca-coordinator
 description: >-
   Entry point for the four-agent Orca pod (Lead, BA, Dev, QC). Use this for any
   software task — feature, bug, refactor, performance, security, infra, migration,
@@ -24,8 +24,8 @@ specialists never talk to each other.
 ## Single source of truth
 
 `references/agents-models.yaml` carries every provider, model, effort, threshold,
-path, condition list, and policy value. Skill files are the *procedure*; the YAML is
-the *parameter table*. Where they disagree, the YAML wins and the skill file is the
+path, condition list, and policy value. Skill files are the _procedure_; the YAML is
+the _parameter table_. Where they disagree, the YAML wins and the skill file is the
 bug.
 
 Resolution precedence: `task_override` → `conditional_escalation` →
@@ -34,20 +34,20 @@ provider/model/effort, stop and report. Never substitute silently.
 
 ## Route
 
-| You are | Read |
-|---|---|
-| Coordinating a task, dispatching, arbitrating, gating | `skills/orca-lead/SKILL.md` |
-| Dispatched to analyse a requirement | `skills/orca-ba/SKILL.md` |
-| Dispatched to implement or fix | `skills/orca-dev/SKILL.md` |
-| Dispatched to verify or review | `skills/orca-qc/SKILL.md` |
-| Handling a mid-flight scope change (Lead only) | `skills/orca-change-control/SKILL.md` |
-| Closing a task (Lead only) | `skills/orca-closeout/SKILL.md` |
+| You are                                               | Read                                  |
+| ----------------------------------------------------- | ------------------------------------- |
+| Coordinating a task, dispatching, arbitrating, gating | `skills/orca-lead/SKILL.md`           |
+| Dispatched to analyse a requirement                   | `skills/orca-ba/SKILL.md`             |
+| Dispatched to implement or fix                        | `skills/orca-dev/SKILL.md`            |
+| Dispatched to verify or review                        | `skills/orca-qc/SKILL.md`             |
+| Handling a mid-flight scope change (Lead only)        | `skills/orca-change-control/SKILL.md` |
+| Closing a task (Lead only)                            | `skills/orca-closeout/SKILL.md`       |
 
 ## Knowledge sources
 
 When `knowledge_sources` declares them available, **GitNexus** (code graph:
 architecture, dependencies, call chains, impacted files) and **Knowns** (project
-memory: decisions, docs, prior implementations) are queried *before* broad repository
+memory: decisions, docs, prior implementations) are queried _before_ broad repository
 scanning. Availability is detected by Lead once per task and stated in the dispatch
 envelope — never assumed by a worker, never a blocker when missing. A stale GitNexus
 index may not be cited as `confirmed` evidence. QC's access to Knowns is restricted:

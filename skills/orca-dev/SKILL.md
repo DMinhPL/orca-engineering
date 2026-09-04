@@ -224,6 +224,21 @@ ROLLBACK
 
 If you cannot write this honestly, the change is M4 and needs a human. Report that.
 
+### You create the branch, but you commit and push only on approval
+
+`modification_policy.branch_naming` names you as `created_by`: at the start of an
+M2+ dispatch, create the work branch yourself with the name Lead put in the
+envelope (`{category}/{slug}[-{ticket}]`) — do not wait for Lead to create it.
+
+`modification_policy.commit_and_push_authorization`, gate `G7_commit_push_approval`.
+Applying an M2+ edit to the working tree authorizes writing the files, nothing
+more. Prepare the diff and a proposed commit message and hand both to Lead — do
+not run `git commit` or `git push` until Lead reports the user has explicitly
+accepted that specific commit or push. Once accepted, **you** run it — Lead
+requests the approval but never executes the git write itself. If acceptance is
+declined, leave the edits exactly as they are: uncommitted, in the working tree,
+local only. Do not revert, stash, or discard them.
+
 ## The self-check — evidence, not narrative
 
 A narrative describes what you did. Evidence describes what is now observably true.

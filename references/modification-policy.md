@@ -166,3 +166,29 @@ One logical change per commit. Refactor and behaviour never mix — a diff that 
 moves and modifies code is unreviewable, and unreviewable diffs are where regressions
 survive. Every commit references the task ID; a commit with no traceable requirement
 is scope creep with a tidy message.
+
+## Commit and push authorization
+
+`modification_policy.commit_and_push_authorization`. No worker — Dev, QC, BA, or
+Lead — may run `git commit` or `git push` without the user having explicitly
+accepted that specific commit or push, gate `G7_commit_push_approval`. This is
+broader than `forbid_direct_commit_to`: that list names which branches may never
+receive a direct commit; this gate governs *every* commit and push, including on
+the task's own work branch.
+
+M2 authorizes Dev to **apply** edits and write the rollback note — it does not by
+itself authorize committing or pushing them. Dev prepares the diff and the
+proposed commit message; Lead requests acceptance from the user using the same
+five-part `request_format` as the other human gates. Once accepted, **Dev** runs
+the `git commit` / `git push` — Lead requests the approval but never runs a git
+write command itself.
+
+Branch creation follows the same split: Lead *names* the branch at
+classification (`branch_naming.decided_by: lead`), but **Dev creates it**, at the
+start of the M2+ dispatch, using the name Lead put in the envelope. Lead never
+runs `git checkout -b`.
+
+**On rejection: keep the changes.** The working tree keeps the uncommitted edits,
+local only. Nothing is discarded, reset, or stashed away just because the commit
+or push was declined — rejection means "not yet" or "not like this," not "undo
+the work."

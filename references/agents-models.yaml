@@ -160,10 +160,6 @@ agents:
       separation_of_concerns: one_reason_to_change_per_unit
       composition_over_inheritance: prefer_composing_behavior_over_deep_hierarchies
       fail_fast: reject_bad_input_or_state_at_the_boundary_not_deep_inside # surface errors at the earliest point, not several calls downstream
-    # v19: Escalation carries evidence forward. fresh_supervised_worker_for_every
-    # _specialist_phase means an escalated Dev boots cold, so without this the
-    # escalation restarts discovery from zero — the single most expensive waste in
-    # the chain, and worse than the model choice it was meant to fix.
     escalation_policy:
       evidence_based: true
       escalate_only_when_execution_produces_evidence: true
@@ -182,16 +178,6 @@ agents:
         - security_or_data_integrity_risk_detected
         - contract_impact_uncertain
         - root_cause_remains_unresolved
-    # v19: Codex-only. The former claude-sonnet-5 / claude-opus-5 alternatives were
-    # unusable in practice: QC is always claude, so either one collided with
-    # qc_policy.independence.qc_provider_must_differ_from_dev_provider and tripped
-    # on_independence_unavailable, capping Dev at M1 — propose-only — at exactly the
-    # moment the task was hardest. Needing Claude for Dev means deliberately moving
-    # QC to codex for that task, never a silent cap.
-    #
-    # scoped_deeper_reasoning and broader_capability are SIBLINGS, not sequential.
-    # Lead picks by which deficit was observed: more thinking on a known scope, or
-    # more capability to understand an unknown one.
     escalation_chain:
       - level: scoped_deeper_reasoning
         provider: codex
@@ -529,6 +515,8 @@ modification_policy:
     required_from_tier: M2
     decided_by: lead
     decided_at: classification
+    created_by: dev
+    created_when: at_start_of_the_m2_plus_dispatch_using_the_name_lead_put_in_the_envelope
     pattern: '{category}/{slug}'
     pattern_with_ticket: '{category}/{slug}-{ticket}'
     categories:
@@ -585,6 +573,20 @@ modification_policy:
     written_before_apply: true
     fields: [mechanism, blast, window]
     if_cannot_be_written_honestly: escalate_to_M4
+  # v17: no worker — including Lead — may run `git commit` or `git push` on any
+  # branch, including the task's own work branch, without explicit user acceptance.
+  # This is stricter than forbid_direct_commit_to: that list governs which branch;
+  # this governs every commit and push regardless of branch.
+  commit_and_push_authorization:
+    applies_to: [work_branch, protected_branch, any_branch]
+    requires_human_acceptance: true
+    requested_by: lead
+    executed_by: dev
+    request_format: human_gates.request_format
+    on_accept: dev_runs_the_stated_commit_or_push_only_lead_never_runs_git_write_commands
+    on_reject: keep_changes_in_working_tree_uncommitted_local_only_do_not_discard
+    no_worker_may_self_authorize: [dev, qc, ba, lead]
+    gate: G7_commit_push_approval
 
 # ─────────────────────────────────────────────────────────────
 # v13: Human gates — the enumerated form of lead.escalate_to_user
@@ -618,6 +620,11 @@ human_gates:
     G6_release:
       when: [merge_to_protected_branch, release_risk_is_high]
       before_phase: final_report
+    G7_commit_push_approval:
+      when: [any_git_commit, any_git_push]
+      before_action: [git_commit, git_push]
+      applies_even_on_the_task_work_branch: true
+      on_reject: keep_changes_in_working_tree_uncommitted_local_only_do_not_discard
 
 engineering_policy:
   task_classification:
@@ -1383,15 +1390,44 @@ worktree_selection_policy:
     - task_requires_isolation_incompatible_with_shared_pool
     - branch_occupancy_conflict_makes_all_candidates_unusable_and_user_approves
   never_create_new_worktree_merely_because_target_branch_is_new: true
+  # v23: sibling placement is enforceable only for creation Lead itself issues.
+  # Orca's own worker-start provisioning nests a new task worktree under Primary
+  # by default, outside Lead's control — treating that as a blocker made Lead stop
+  # on routine platform behavior. Split by who controls the path instead.
   new_worktree_path_policy:
     location: sibling_of_project_root
     pattern: '{project_parent_dir}/{worktree_name}'
     example: project at /c/DM/Mine/Sources/second-thoughts, project_parent_dir is /c/DM/Mine/Sources, new worktree named workspace_2 goes at /c/DM/Mine/Sources/workspace_2
     never_nest_inside_project_root: true
     rationale: sibling_worktrees_keep_editor_and_search_tooling_scoped_to_one_project_root_at_a_time
+    lead_initiated_creation:
+      enforcement: hard_requirement
+      verify_before_creation: true
+      verify_after_creation: true
+      on_violation: stop_and_report_blocker
+    orca_tooling_initiated_creation:
+      enforcement: expected_platform_behavior_not_a_blocker
+      never_assert_sibling_without_verifying_actual_path: true
+      report_to_user: always
+      report_line_example: 'workspace_2: physically nested under Primary; Orca-managed'
+      do_not_relocate_or_recreate_automatically: true
   worker_launch_after_selection:
     workspace_reuse_does_not_imply_session_reuse: true
     start_fresh_supervised_worker_bound_to_selected_worktree: true
+  # v23: folded in from the standalone workspace-pool-policy.md draft — the two
+  # rules it stated that this block did not already cover.
+  single_worker_invariant:
+    max_active_workers_per_task_role_stage: 1
+    display_name_request_must_never_trigger_worker_start: true
+    settled_or_retained_terminal_is_not_a_reusable_active_worker: true
+    second_worker_allowed_only_for: [retry, rework, escalation, user_approved_parallel_work]
+    on_duplicate_active_dispatch_for_same_task_role_stage: stop_and_report_anomaly
+  identity_policy:
+    display_identity: user_selected_worktree_name
+    format: '{worktree_name} · {ROLE}'
+    keep_branch_and_tracking_as_separate_metadata_lines: true
+    never_rename_display_identity_when_branch_inside_worktree_changes: true
+    never_derive_display_name_from_branch_unless_user_explicitly_asks: true
 
 cleanup_policy:
   accepted_worker_done_result_is_immutable_during_cleanup: true

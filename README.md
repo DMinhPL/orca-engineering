@@ -58,6 +58,10 @@ skills/
 
 ## Single source of truth
 
+After each verified worker launch, Lead records a compact receipt containing the
+Run, Task, Dispatch, provider/model/effort, worker verification, workspace, and
+branch. This makes orchestration state visible without adding another workflow gate.
+
 [`references/agents-models.yaml`](references/agents-models.yaml) carries every
 provider, model, effort, threshold, path, condition list, and policy value. Skill
 files are the *procedure*; the YAML is the *parameter table*. Where they disagree,
