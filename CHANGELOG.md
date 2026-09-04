@@ -14,6 +14,27 @@ Legend: `+` added · `~` changed · `-` removed
 
 ---
 
+## Unreleased — coordinator observability and authorization clarifications
+
+Changes since v25 are documented here pending the next config-versioned release:
+
+- `+ modification_policy.commit_and_push_authorization` and
+  `+ human_gates.G7_commit_push_approval` — require explicit user acceptance for
+  every commit or push, including on a task work branch; Dev performs the accepted
+  git operation, while rejected changes remain uncommitted and local.
+- `~ modification_policy.branch_naming` — Lead names an M2+ work branch and Dev
+  creates it at dispatch start.
+- `+ workflows.md` verified launch receipt — record the Run, Task, Dispatch,
+  worker configuration, verification state, workspace, and branch immediately
+  after a verified worker launch.
+- `+ worktree_selection_policy` safeguards — distinguish Lead-created worktrees
+  from Orca-managed provisioning, enforce one active worker per task role/stage,
+  and keep workspace display identity separate from branch identity.
+- `~ README.md` and project-overlay guidance — document independent
+  `extra-skills/{role}/*.md` overlays and add a worked-example reference.
+- `~ SKILL.md` — rename the package skill to `orca-coordinator` and align its
+  formatting with the current documentation style.
+
 ## v25 — project overlay is a directory of files, not one file
 
 v24 shipped as a single `.orca/{role}.md` file. In practice a project has several
